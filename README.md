@@ -4,11 +4,11 @@
 This tool/script retrieves tokens for all devices connected to Xiaomi cloud.
 
 You will need to provide:
-- username/e-mail
+- username (e-mail or Xiaomi Cloud account ID)
 - password
-- Xiaomi's server region (CN - China, DE - Germany etc.)
+- Xiaomi's server region (`cn` - China, `de` - Germany etc.). Leave empty to check all available
 
-In return - all of your devices connected to account will be listed, together with their name and IP address.
+In return all of your devices connected to account will be listed, together with their name and IP address.
 
 ## Windows
 Download and run [token_extractor.exe](https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/raw/master/token_extractor.exe).

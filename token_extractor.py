@@ -11,10 +11,9 @@ from Crypto.Hash import MD5, SHA256
 
 class XiaomiCloudConnector:
 
-    def __init__(self, username, password, country):
+    def __init__(self, username, password):
         self._username = username
         self._password = password
-        self._country = country
         self._agent = self.generate_agent()
         self._device_id = self.generate_device_id()
         self._session = requests.session()
@@ -89,15 +88,15 @@ class XiaomiCloudConnector:
                 if self.login_step_3():
                     return True
                 else:
-                    print("Unable to get service token")
+                    print("Unable to get service token.")
             else:
-                print("Invalid login or password")
+                print("Invalid login or password.")
         else:
-            print("Invalid username")
+            print("Invalid username.")
         return False
 
-    def get_devices(self):
-        url = self.get_api_url() + "/home/device_list"
+    def get_devices(self, country):
+        url = self.get_api_url(country) + "/home/device_list"
         params = {
             "data": '{"getVirtualModel":false,"getHuamiDevices":0}'
         }
@@ -134,8 +133,8 @@ class XiaomiCloudConnector:
             return response.json()
         return None
 
-    def get_api_url(self):
-        return "https://" + ("" if self._country == "cn" else (self._country + ".")) + "api.io.mi.com/app"
+    def get_api_url(self, country):
+        return "https://" + ("" if country == "cn" else (country + ".")) + "api.io.mi.com/app"
 
     def signed_nonce(self, nonce):
         hash_object = SHA256.new()
@@ -174,34 +173,47 @@ print("Username (email or user ID):")
 username = input()
 print("Password:")
 password = input()
-print("Country (one of: ru, us, tw, sg, cn, de):")
+print("Country (one of: ru, us, tw, sg, cn, de) Leave empty to check all available:")
 country = input()
-while country not in ["ru", "us", "tw", "sg", "cn", "de"]:
+while country not in ["", "ru", "us", "tw", "sg", "cn", "de"]:
     print("Invalid country provided. Valid values: ru, us, tw, sg, cn, de")
     print("Country:")
     country = input()
 
 print()
-connector = XiaomiCloudConnector(username, password, country)
+countries = ["cn", "de", "us", "ru", "tw", "sg"]
+if not country == "":
+    countries = [country]
+
+connector = XiaomiCloudConnector(username, password)
+print("Logging in...")
 logged = connector.login()
 if logged:
-    devices = connector.get_devices()
-    if devices is not None:
-        print("Found devices:")
-        for device in devices["result"]["list"]:
-            print("-----")
-            if "name" in device:
-                print("NAME:  " + device["name"])
-            if "did" in device:
-                print("ID:    " + device["did"])
-            if "localip" in device:
-                print("IP:    " + device["localip"])
-            if "token" in device:
-                print("TOKEN: " + device["token"])
-    else:
-        print("Unable to get devices")
+    print("Logged in.")
+    print()
+    for current_country in countries:
+        devices = connector.get_devices(current_country)
+        if devices is not None:
+            if len(devices["result"]["list"]) == 0:
+                print(f"No devices found for country \"{current_country}\".")
+                continue
+            print(f"Devices found for country \"{current_country}\":")
+            for device in devices["result"]["list"]:
+                print("   ---------")
+                if "name" in device:
+                    print("   NAME:  " + device["name"])
+                if "did" in device:
+                    print("   ID:    " + device["did"])
+                if "localip" in device:
+                    print("   IP:    " + device["localip"])
+                if "token" in device:
+                    print("   TOKEN: " + device["token"])
+            print("   ---------")
+            print()
+        else:
+            print("Unable to get devices.")
 else:
-    print("Unable to log in")
+    print("Unable to log in.")
 
 print()
 print("Press ENTER to finish")
