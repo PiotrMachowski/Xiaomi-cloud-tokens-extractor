@@ -181,6 +181,7 @@ while country not in ["ru", "us", "tw", "sg", "cn", "de"]:
     print("Country:")
     country = input()
 
+print()
 connector = XiaomiCloudConnector(username, password, country)
 logged = connector.login()
 if logged:
@@ -201,3 +202,7 @@ if logged:
         print("Unable to get devices")
 else:
     print("Unable to log in")
+
+print()
+print("Push ENTER to finish")
+input()
