@@ -204,5 +204,5 @@ else:
     print("Unable to log in")
 
 print()
-print("Push ENTER to finish")
+print("Press ENTER to finish")
 input()
