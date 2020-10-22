@@ -1,7 +1,7 @@
 # Xiaomi Cloud Tokens Extractor
 [![buymeacoffee_badge](https://img.shields.io/badge/Donate-buymeacoffe-ff813f?style=flat)](https://www.buymeacoffee.com/PiotrMachowski)
 
-This tool/scripts retrieves tokens for all devices connected to Xiaomi cloud.
+This tool/script retrieves tokens for all devices connected to Xiaomi cloud.
 
 ## Windows
 Download and run [token_extractor.exe](https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/raw/master/token_extractor.exe).
