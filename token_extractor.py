@@ -208,6 +208,8 @@ if logged:
                     print("   IP:    " + device["localip"])
                 if "token" in device:
                     print("   TOKEN: " + device["token"])
+                if "model" in device:
+                    print("   MODEL: " + device["model"])
             print("   ---------")
             print()
         else:
