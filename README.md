@@ -13,6 +13,13 @@ In return all of your devices connected to account will be listed, together with
 ## Windows
 Download and run [token_extractor.exe](https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/raw/master/token_extractor.exe).
 
+## Docker
+
+Run script using docker:
+```bash
+docker run --rm -it $(docker build -q .)
+```
+
 ## Other platforms
 
 Install dependencies:
