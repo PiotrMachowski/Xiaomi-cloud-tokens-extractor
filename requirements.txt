@@ -1,0 +1,3 @@
+pycryptodome
+pybase64
+requests
