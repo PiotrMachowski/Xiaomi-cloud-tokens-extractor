@@ -3,7 +3,7 @@
 
 This tool/script retrieves tokens for all devices connected to Xiaomi cloud.
 
-You will need to provide:
+You will need to provide Xiaomi Home credentials (_not ones from Roborock app_):
 - username (e-mail or Xiaomi Cloud account ID)
 - password
 - Xiaomi's server region (`cn` - China, `de` - Germany etc.). Leave empty to check all available
