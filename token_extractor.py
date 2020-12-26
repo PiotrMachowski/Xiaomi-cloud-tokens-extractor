@@ -169,21 +169,22 @@ class XiaomiCloudConnector:
         return json.loads(response_text.replace("&&&START&&&", ""))
 
 
+servers = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
+servers_str = ", ".join(servers)
 print("Username (email or user ID):")
 username = input()
 print("Password:")
 password = input()
-print("Country (one of: ru, us, tw, sg, cn, de) Leave empty to check all available:")
-country = input()
-while country not in ["", "ru", "us", "tw", "sg", "cn", "de"]:
-    print("Invalid country provided. Valid values: ru, us, tw, sg, cn, de")
-    print("Country:")
-    country = input()
+print(f"Server (one of: {servers_str}) Leave empty to check all available:")
+server = input()
+while server not in ["", *servers]:
+    print(f"Invalid server provided. Valid values: {servers_str}")
+    print("Server:")
+    server = input()
 
 print()
-countries = ["cn", "de", "us", "ru", "tw", "sg"]
-if not country == "":
-    countries = [country]
+if not server == "":
+    servers = [server]
 
 connector = XiaomiCloudConnector(username, password)
 print("Logging in...")
@@ -191,13 +192,13 @@ logged = connector.login()
 if logged:
     print("Logged in.")
     print()
-    for current_country in countries:
-        devices = connector.get_devices(current_country)
+    for current_server in servers:
+        devices = connector.get_devices(current_server)
         if devices is not None:
             if len(devices["result"]["list"]) == 0:
-                print(f"No devices found for country \"{current_country}\".")
+                print(f"No devices found for server \"{current_server}\".")
                 continue
-            print(f"Devices found for country \"{current_country}\":")
+            print(f"Devices found for server \"{current_server}\":")
             for device in devices["result"]["list"]:
                 print("   ---------")
                 if "name" in device:
