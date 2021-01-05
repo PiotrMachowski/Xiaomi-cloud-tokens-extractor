@@ -15,7 +15,17 @@ Download and run [token_extractor.exe](https://github.com/PiotrMachowski/Xiaomi-
 
 ## Docker
 
-Run script using docker:
+Clone this repository:
+```bash
+git clone https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor.git
+```
+
+Go to cloned directory:
+```bash
+cd Xiaomi-cloud-tokens-extractor
+```
+
+Build and run script using docker:
 ```bash
 docker run --rm -it $(docker build -q .)
 ```
