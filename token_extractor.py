@@ -6,7 +6,6 @@ import os
 import time
 import requests
 import random
-from Crypto.Hash import MD5, SHA256
 
 
 class XiaomiCloudConnector:
@@ -49,7 +48,7 @@ class XiaomiCloudConnector:
         }
         fields = {
             "sid": "xiaomiio",
-            "hash": (MD5.new(str.encode(self._password)).hexdigest() + "").upper(),
+            "hash": hashlib.md5(str.encode(self._password)).hexdigest().upper(),
             "callback": "https://sts.api.io.mi.com/sts",
             "qs": "%3Fsid%3Dxiaomiio%26_json%3Dtrue",
             "user": self._username,
@@ -137,8 +136,7 @@ class XiaomiCloudConnector:
         return "https://" + ("" if country == "cn" else (country + ".")) + "api.io.mi.com/app"
 
     def signed_nonce(self, nonce):
-        hash_object = SHA256.new()
-        hash_object.update(base64.b64decode(self._ssecurity) + base64.b64decode(nonce))
+        hash_object = hashlib.sha256(base64.b64decode(self._ssecurity) + base64.b64decode(nonce))
         return base64.b64encode(hash_object.digest()).decode('utf-8')
 
     @staticmethod
