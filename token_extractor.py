@@ -102,6 +102,13 @@ class XiaomiCloudConnector:
         }
         return self.execute_api_call(url, params)
 
+    def get_btkey(self, country, did):
+        url = self.get_api_url(country) + "/v2/device/blt_get_beaconkey"
+        params = {
+            "data": '{"did":"' + did + '","pdid":1}'
+        }
+        return self.execute_api_call(url, params)
+
     def execute_api_call(self, url, params):
         headers = {
             "Accept-Encoding": "gzip",
@@ -201,16 +208,22 @@ if logged:
             print(f"Devices found for server \"{current_server}\":")
             for device in devices["result"]["list"]:
                 print("   ---------")
-                if "name" in device:
+                if "name" in device and device["name"]:
                     print("   NAME:  " + device["name"])
-                if "did" in device:
+                if "did" in device and device["did"]:
                     print("   ID:    " + device["did"])
-                if "localip" in device:
+                if "localip" in device and device["localip"]:
                     print("   IP:    " + device["localip"])
-                if "token" in device:
+                if "token" in device and device["token"]:
                     print("   TOKEN: " + device["token"])
-                if "model" in device:
+                if "model" in device and device["model"]:
                     print("   MODEL: " + device["model"])
+                if device["did"].startswith("blt."):
+                    btkey = connector.get_btkey(current_server, device["did"])
+                    if btkey is not None:
+                        btkey = btkey["result"]
+                        if "beaconkey" in btkey and btkey["beaconkey"]:
+                            print("   BTKEY: " + btkey["beaconkey"])
             print("   ---------")
             print()
         else:
