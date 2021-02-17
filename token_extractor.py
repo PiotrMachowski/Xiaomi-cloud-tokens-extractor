@@ -179,7 +179,7 @@ def print_tabbed(value, tab):
 
 
 def print_entry(key, value, tab):
-    if value is not None:
+    if value:
         print_tabbed(f'{key + ":": <10}{value}', tab)
 
 
@@ -221,7 +221,8 @@ if logged:
                     print_entry("ID", device["did"], 3)
                     if "blt" in device["did"]:
                         beaconkey = connector.get_beaconkey(current_server, device["did"])
-                        print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
+                        if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
+                            print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
                 if "localip" in device:
                     print_entry("IP", device["localip"], 3)
                 if "token" in device:
