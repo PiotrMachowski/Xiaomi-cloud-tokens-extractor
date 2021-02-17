@@ -100,6 +100,13 @@ class XiaomiCloudConnector:
             "data": '{"getVirtualModel":false,"getHuamiDevices":0}'
         }
         return self.execute_api_call(url, params)
+        
+    def get_beaconkey(self, country, did):
+        url = self.get_api_url(country) + "/v2/device/blt_get_beaconkey"
+        params = {
+            "data": '{"did":"' + did  + '","pdid":1}'
+        }
+        return self.execute_api_call(url, params)
 
     def execute_api_call(self, url, params):
         headers = {
@@ -203,6 +210,9 @@ if logged:
                     print("   NAME:  " + device["name"])
                 if "did" in device:
                     print("   ID:    " + device["did"])
+                    if "blt" in device["did"]:
+                        beaconkey = connector.get_beaconkey(current_server, device["did"])
+                        print("   KEY:   " + beaconkey["result"]["beaconkey"])
                 if "localip" in device:
                     print("   IP:    " + device["localip"])
                 if "token" in device:
