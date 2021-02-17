@@ -2,7 +2,7 @@
 [![buymeacoffee_badge](https://img.shields.io/badge/Donate-Buy%20Me%20a%20Coffee-ff813f?style=flat)](https://www.buymeacoffee.com/PiotrMachowski)
 [![paypalme_badge](https://img.shields.io/badge/Donate-PayPal-0070ba?style=flat)](https://paypal.me/PiMachowski)
 
-This tool/script retrieves tokens for all devices connected to Xiaomi cloud.
+This tool/script retrieves tokens for all devices connected to Xiaomi cloud and encryption keys for BLE devices.
 
 You will need to provide Xiaomi Home credentials (_not ones from Roborock app_):
 - username (e-mail or Xiaomi Cloud account ID)
