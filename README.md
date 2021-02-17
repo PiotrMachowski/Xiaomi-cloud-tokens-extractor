@@ -35,7 +35,7 @@ docker run --rm -it $(docker build -q .)
 
 Install dependencies:
 ```bash
-pip3 install pycryptodome pybase64 requests
+pip3 install requests
 ```
 
 Download and run script:
