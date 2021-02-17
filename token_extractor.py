@@ -100,11 +100,11 @@ class XiaomiCloudConnector:
             "data": '{"getVirtualModel":false,"getHuamiDevices":0}'
         }
         return self.execute_api_call(url, params)
-        
+
     def get_beaconkey(self, country, did):
         url = self.get_api_url(country) + "/v2/device/blt_get_beaconkey"
         params = {
-            "data": '{"did":"' + did  + '","pdid":1}'
+            "data": '{"did":"' + did + '","pdid":1}'
         }
         return self.execute_api_call(url, params)
 
@@ -174,6 +174,15 @@ class XiaomiCloudConnector:
         return json.loads(response_text.replace("&&&START&&&", ""))
 
 
+def print_tabbed(value, tab):
+    print(" " * tab + value)
+
+
+def print_entry(key, value, tab):
+    if value is not None:
+        print_tabbed(f'{key + ":": <10}{value}', tab)
+
+
 servers = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
 servers_str = ", ".join(servers)
 print("Username (email or user ID):")
@@ -205,21 +214,21 @@ if logged:
                 continue
             print(f"Devices found for server \"{current_server}\":")
             for device in devices["result"]["list"]:
-                print("   ---------")
+                print_tabbed("---------", 3)
                 if "name" in device:
-                    print("   NAME:  " + device["name"])
+                    print_entry("NAME", device["name"], 3)
                 if "did" in device:
-                    print("   ID:    " + device["did"])
+                    print_entry("ID", device["did"], 3)
                     if "blt" in device["did"]:
                         beaconkey = connector.get_beaconkey(current_server, device["did"])
-                        print("   KEY:   " + beaconkey["result"]["beaconkey"])
+                        print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
                 if "localip" in device:
-                    print("   IP:    " + device["localip"])
+                    print_entry("IP", device["localip"], 3)
                 if "token" in device:
-                    print("   TOKEN: " + device["token"])
+                    print_entry("TOKEN", device["token"], 3)
                 if "model" in device:
-                    print("   MODEL: " + device["model"])
-            print("   ---------")
+                    print_entry("MODEL", device["model"], 3)
+            print_tabbed("---------", 3)
             print()
         else:
             print("Unable to get devices.")
