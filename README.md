@@ -50,3 +50,9 @@ python3 token_extractor.py
 * [Map card](https://github.com/PiotrMachowski/lovelace-xiaomi-vacuum-map-card) - manual vacuum control from a Lovelace card
 
 <a href="https://www.buymeacoffee.com/PiotrMachowski" target="_blank"><img src="https://bmc-cdn.nyc3.digitaloceanspaces.com/BMC-button-images/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
+
+## Community Videos & Articles
+
+* [Home Assistant Xiaomi Vacuum Cleaner Integration](https://youtu.be/VB2YfcTwsmM) - Video
+* [Home Assistant Xiaomi Vacuum Cleaner Integration](https://peyanski.com/home-assistant-xiaomi-vacuum-cleaner-integration/) - Article
+
