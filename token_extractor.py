@@ -3,9 +3,10 @@ import hashlib
 import hmac
 import json
 import os
-import time
-import requests
 import random
+import time
+
+import requests
 
 
 class XiaomiCloudConnector:
@@ -56,15 +57,22 @@ class XiaomiCloudConnector:
             "_json": "true"
         }
         response = self._session.post(url, headers=headers, params=fields)
-        valid = response.status_code == 200 and "ssecurity" in self.to_json(response.text)
+        valid = response is not None and response.status_code == 200
         if valid:
             json_resp = self.to_json(response.text)
-            self._ssecurity = json_resp["ssecurity"]
-            self._userId = json_resp["userId"]
-            self._cUserId = json_resp["cUserId"]
-            self._passToken = json_resp["passToken"]
-            self._location = json_resp["location"]
-            self._code = json_resp["code"]
+            valid = "ssecurity" in json_resp and len(str(json_resp["ssecurity"])) > 4
+            if valid:
+                self._ssecurity = json_resp["ssecurity"]
+                self._userId = json_resp["userId"]
+                self._cUserId = json_resp["cUserId"]
+                self._passToken = json_resp["passToken"]
+                self._location = json_resp["location"]
+                self._code = json_resp["code"]
+            else:
+                if "notificationUrl" in json_resp:
+                    print("Two factor authentication required, please use following url and restart extractor:")
+                    print(json_resp["notificationUrl"])
+                    print()
         return valid
 
     def login_step_3(self):
