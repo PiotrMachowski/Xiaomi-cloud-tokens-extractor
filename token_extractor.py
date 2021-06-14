@@ -5,8 +5,12 @@ import json
 import os
 import random
 import time
+from sys import platform
 
 import requests
+
+if platform != "win32":
+    import readline
 
 
 class XiaomiCloudConnector:
