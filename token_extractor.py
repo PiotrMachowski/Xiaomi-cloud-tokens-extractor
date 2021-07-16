@@ -235,6 +235,8 @@ if logged:
                         beaconkey = connector.get_beaconkey(current_server, device["did"])
                         if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
                             print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
+                if "mac" in device:
+                    print_entry("MAC", device["mac"], 3)
                 if "localip" in device:
                     print_entry("IP", device["localip"], 3)
                 if "token" in device:
