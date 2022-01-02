@@ -12,6 +12,49 @@ import requests
 if platform != "win32":
     import readline
 
+class RC4:
+    _idx = 0
+    _jdx = 0
+    _ksa: list
+
+    def __init__(self, pwd):
+        self.init_key(pwd)
+
+    def init_key(self, pwd):
+        cnt = len(pwd)
+        ksa = list(range(256))
+        j = 0
+        for i in range(256):
+            j = (j + ksa[i] + pwd[i % cnt]) & 255
+            ksa[i], ksa[j] = ksa[j], ksa[i]
+        self._ksa = ksa
+        self._idx = 0
+        self._jdx = 0
+
+        self.init1024()
+
+        return self
+
+    def crypt(self, data):
+        if isinstance(data, str):
+            data = data.encode()
+        ksa = self._ksa
+        i = self._idx
+        j = self._jdx
+        out = []
+        for byt in data:
+            i = (i + 1) & 255
+            j = (j + ksa[i]) & 255
+            ksa[i], ksa[j] = ksa[j], ksa[i]
+            out.append(byt ^ ksa[(ksa[i] + ksa[j]) & 255])
+        self._idx = i
+        self._jdx = j
+        self._ksa = ksa
+        return bytearray(out)
+
+    def init1024(self):
+        self.crypt(bytes(1024))
+        return
 
 class XiaomiCloudConnector:
 
@@ -125,7 +168,8 @@ class XiaomiCloudConnector:
             "Accept-Encoding": "gzip",
             "User-Agent": self._agent,
             "Content-Type": "application/x-www-form-urlencoded",
-            "x-xiaomi-protocal-flag-cli": "PROTOCAL-HTTP2"
+            "x-xiaomi-protocal-flag-cli": "PROTOCAL-HTTP2",
+            'MIOT-ENCRYPT-ALGORITHM': 'ENCRYPT-RC4',
         }
         cookies = {
             "userId": str(self._userId),
@@ -140,15 +184,10 @@ class XiaomiCloudConnector:
         millis = round(time.time() * 1000)
         nonce = self.generate_nonce(millis)
         signed_nonce = self.signed_nonce(nonce)
-        signature = self.generate_signature(url.replace("/app", ""), signed_nonce, nonce, params)
-        fields = {
-            "signature": signature,
-            "_nonce": nonce,
-            "data": params["data"]
-        }
-        response = self._session.post(url, headers=headers, cookies=cookies, params=fields)
+        params = self.generate_rc4_params(url.replace("/app", ""), signed_nonce, nonce, params, self._ssecurity)
+        response = self._session.post(url, headers=headers, cookies=cookies, params=params)
         if response.status_code == 200:
-            return response.json()
+            return json.loads(self.decrypt_data(signed_nonce, response.text).decode())
         return None
 
     def get_api_url(self, country):
@@ -173,18 +212,41 @@ class XiaomiCloudConnector:
         return "".join(map(lambda i: chr(i), [random.randint(97, 122) for _ in range(6)]))
 
     @staticmethod
-    def generate_signature(url, signed_nonce, nonce, params):
-        signature_params = [url.split("com")[1], signed_nonce, nonce]
+    def generate_rc4_params(url, signed_nonce, nonce, params, ssecurity):
+        params['rc4_hash__'] = XiaomiCloudConnector.sha1_sign('POST', url, params, signed_nonce)
         for k, v in params.items():
-            signature_params.append(f"{k}={v}")
-        signature_string = "&".join(signature_params)
-        signature = hmac.new(base64.b64decode(signed_nonce), msg=signature_string.encode(), digestmod=hashlib.sha256)
-        return base64.b64encode(signature.digest()).decode()
+            params[k] = XiaomiCloudConnector.encrypt_data(signed_nonce, v)
+        params.update({
+            'signature': XiaomiCloudConnector.sha1_sign('POST', url, params, signed_nonce),
+            'ssecurity': ssecurity,
+            '_nonce': nonce,
+        })
+
+        return params
 
     @staticmethod
     def to_json(response_text):
         return json.loads(response_text.replace("&&&START&&&", ""))
 
+    @staticmethod
+    def sha1_sign(method, url, dat: dict, nonce):
+        path = url.split("com")[1]
+        if path[:4] == '/app/':
+            path = path[4:]
+        arr = [str(method).upper(), path]
+        for k, v in dat.items():
+            arr.append(f'{k}={v}')
+        arr.append(nonce)
+        raw = hashlib.sha1('&'.join(arr).encode('utf-8')).digest()
+        return base64.b64encode(raw).decode()
+
+    @staticmethod
+    def encrypt_data(pwd, data):
+        return base64.b64encode(RC4(base64.b64decode(pwd)).crypt(data)).decode()
+
+    @staticmethod
+    def decrypt_data(pwd, data):
+        return RC4(base64.b64decode(pwd)).crypt(base64.b64decode(data))
 
 def print_tabbed(value, tab):
     print(" " * tab + value)
