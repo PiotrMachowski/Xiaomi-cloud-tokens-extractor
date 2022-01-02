@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download repo
+        uses: actions/checkout@v1
+
+      - name: Create token_extractor.exe
+        uses: JackMcKew/pyinstaller-action-windows@main
+        with:
+          path: .
+
+      - name: Create token_extractor.zip
+        run: |
+          cd /home/runner/work/Xiaomi-cloud-tokens-extractor-tmp/Xiaomi-cloud-tokens-extractor-tmp
+          mkdir -p token_extractor
+          cp token_extractor.py token_extractor/
+          cp requirements.txt token_extractor/
+          zip token_extractor.zip -r token_extractor
+          rm -rf token_extractor
+
+      - name: Create token_extractor_docker.zip
+        run: |
+          cd /home/runner/work/Xiaomi-cloud-tokens-extractor-tmp/Xiaomi-cloud-tokens-extractor-tmp
+          mkdir -p token_extractor_docker
+          cp token_extractor.py token_extractor_docker/
+          cp requirements.txt token_extractor_docker/
+          cp .dockerignore token_extractor_docker/
+          cp Dockerfile token_extractor_docker/
+          zip token_extractor_docker.zip -r token_extractor_docker
+          rm -rf token_extractor_docker
+
+      - name: Upload token_extractor.exe to release
+        uses: svenstaro/upload-release-action@v1-release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: /home/runner/work/Xiaomi-cloud-tokens-extractor-tmp/Xiaomi-cloud-tokens-extractor-tmp/dist/windows/token_extractor.exe
+          asset_name: token_extractor.exe
+          tag: ${{ github.ref }}
+          overwrite: true
+
+      - name: Upload token_extractor.zip to release
+        uses: svenstaro/upload-release-action@v1-release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: /home/runner/work/Xiaomi-cloud-tokens-extractor-tmp/Xiaomi-cloud-tokens-extractor-tmp/token_extractor.zip
+          asset_name: token_extractor.zip
+          tag: ${{ github.ref }}
+          overwrite: true
+
+      - name: Upload token_extractor_docker.zip to release
+        uses: svenstaro/upload-release-action@v1-release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: /home/runner/work/Xiaomi-cloud-tokens-extractor-tmp/Xiaomi-cloud-tokens-extractor-tmp/token_extractor_docker.zip
+          asset_name: token_extractor_docker.zip
+          tag: ${{ github.ref }}
+          overwrite: true
