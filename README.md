@@ -1,6 +1,20 @@
 # Xiaomi Cloud Tokens Extractor
-[![buymeacoffee_badge](https://img.shields.io/badge/Donate-Buy%20Me%20a%20Coffee-ff813f?style=flat)](https://www.buymeacoffee.com/PiotrMachowski)
-[![paypalme_badge](https://img.shields.io/badge/Donate-PayPal-0070ba?style=flat)](https://paypal.me/PiMachowski)
+[![GitHub Latest Release][releases_shield]][latest_release]
+[![GitHub All Releases][downloads_total_shield]][releases]
+[![Buy me a coffee][buy_me_a_coffee_shield]][buy_me_a_coffee]
+[![PayPal.Me][paypal_me_shield]][paypal_me]
+
+[latest_release]: https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/releases/latest
+[releases_shield]: https://img.shields.io/github/release/PiotrMachowski/Xiaomi-cloud-tokens-extractor.svg?style=popout
+
+[releases]: https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/releases
+[downloads_total_shield]: https://img.shields.io/github/downloads/PiotrMachowski/Xiaomi-cloud-tokens-extractor/total
+
+[buy_me_a_coffee_shield]: https://img.shields.io/static/v1.svg?label=%20&message=Buy%20me%20a%20coffee&color=6f4e37&logo=buy%20me%20a%20coffee&logoColor=white
+[buy_me_a_coffee]: https://www.buymeacoffee.com/PiotrMachowski
+
+[paypal_me_shield]: https://img.shields.io/static/v1.svg?label=%20&message=PayPal.Me&logo=paypal
+[paypal_me]: https://paypal.me/PiMachowski
 
 This tool/script retrieves tokens for all devices connected to Xiaomi cloud and encryption keys for BLE devices.
 
