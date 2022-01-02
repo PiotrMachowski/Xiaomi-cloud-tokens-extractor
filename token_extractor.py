@@ -6,6 +6,7 @@ import os
 import random
 import time
 from sys import platform
+from Crypto.Cipher import ARC4
 
 import requests
 
@@ -109,23 +110,24 @@ class XiaomiCloudConnector:
     def get_devices(self, country):
         url = self.get_api_url(country) + "/home/device_list"
         params = {
-            "data": '{"getVirtualModel":false,"getHuamiDevices":0}'
+            "data": '{"getVirtualModel":true,"getHuamiDevices":1,"get_split_device":false,"support_smart_home":true}'
         }
-        return self.execute_api_call(url, params)
+        return self.execute_api_call_encrypted(url, params)
 
     def get_beaconkey(self, country, did):
         url = self.get_api_url(country) + "/v2/device/blt_get_beaconkey"
         params = {
             "data": '{"did":"' + did + '","pdid":1}'
         }
-        return self.execute_api_call(url, params)
+        return self.execute_api_call_encrypted(url, params)
 
-    def execute_api_call(self, url, params):
+    def execute_api_call_encrypted(self, url, params):
         headers = {
-            "Accept-Encoding": "gzip",
+            "Accept-Encoding": "identity",
             "User-Agent": self._agent,
             "Content-Type": "application/x-www-form-urlencoded",
-            "x-xiaomi-protocal-flag-cli": "PROTOCAL-HTTP2"
+            "x-xiaomi-protocal-flag-cli": "PROTOCAL-HTTP2",
+            "MIOT-ENCRYPT-ALGORITHM": "ENCRYPT-RC4",
         }
         cookies = {
             "userId": str(self._userId),
@@ -140,15 +142,11 @@ class XiaomiCloudConnector:
         millis = round(time.time() * 1000)
         nonce = self.generate_nonce(millis)
         signed_nonce = self.signed_nonce(nonce)
-        signature = self.generate_signature(url.replace("/app", ""), signed_nonce, nonce, params)
-        fields = {
-            "signature": signature,
-            "_nonce": nonce,
-            "data": params["data"]
-        }
+        fields = self.generate_enc_params(url, "POST", signed_nonce, nonce, params, self._ssecurity)
         response = self._session.post(url, headers=headers, cookies=cookies, params=fields)
         if response.status_code == 200:
-            return response.json()
+            decoded = self.decrypt_rc4(self.signed_nonce(fields["_nonce"]), response.text)
+            return json.loads(decoded)
         return None
 
     def get_api_url(self, country):
@@ -182,8 +180,41 @@ class XiaomiCloudConnector:
         return base64.b64encode(signature.digest()).decode()
 
     @staticmethod
+    def generate_enc_signature(url, method, signed_nonce, params):
+        signature_params = [str(method).upper(), url.split("com")[1].replace("/app/", "/")]
+        for k, v in params.items():
+            signature_params.append(f"{k}={v}")
+        signature_params.append(signed_nonce)
+        signature_string = "&".join(signature_params)
+        return base64.b64encode(hashlib.sha1(signature_string.encode('utf-8')).digest()).decode()
+
+    @staticmethod
+    def generate_enc_params(url, method, signed_nonce, nonce, params, ssecurity):
+        params['rc4_hash__'] = XiaomiCloudConnector.generate_enc_signature(url, method, signed_nonce, params)
+        for k, v in params.items():
+            params[k] = XiaomiCloudConnector.encrypt_rc4(signed_nonce, v)
+        params.update({
+            'signature': XiaomiCloudConnector.generate_enc_signature(url, method, signed_nonce, params),
+            'ssecurity': ssecurity,
+            '_nonce': nonce,
+        })
+        return params
+
+    @staticmethod
     def to_json(response_text):
         return json.loads(response_text.replace("&&&START&&&", ""))
+
+    @staticmethod
+    def encrypt_rc4(password, payload):
+        r = ARC4.new(base64.b64decode(password))
+        r.encrypt(bytes(1024))
+        return base64.b64encode(r.encrypt(payload.encode())).decode()
+
+    @staticmethod
+    def decrypt_rc4(password, payload):
+        r = ARC4.new(base64.b64decode(password))
+        r.encrypt(bytes(1024))
+        return r.encrypt(base64.b64decode(payload))
 
 
 def print_tabbed(value, tab):
@@ -235,6 +266,8 @@ if logged:
                         beaconkey = connector.get_beaconkey(current_server, device["did"])
                         if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
                             print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
+                if "mac" in device:
+                    print_entry("MAC", device["mac"], 3)
                 if "localip" in device:
                     print_entry("IP", device["localip"], 3)
                 if "token" in device:
@@ -244,7 +277,7 @@ if logged:
             print_tabbed("---------", 3)
             print()
         else:
-            print("Unable to get devices.")
+            print(f"Unable to get devices from server {current_server}.")
 else:
     print("Unable to log in.")
 
