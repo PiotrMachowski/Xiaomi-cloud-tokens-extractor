@@ -57,6 +57,14 @@ pip3 install -r requirements.txt
 python3 token_extractor.py
 ```
 
+## Troubleshooting
+
+If you have problems with using this tool try following solutions:
+- Make yourself sure that you provide correct credentials (_e.g. not ones from Roborock app!_)
+- Remove Cloudflare DNS
+- Disable network ad blockers (AdGuard, PiHole, etc.)
+- Open 2FA link on the same device that runs Tokens Extractor
+
 ## Home Assistant additional tools
 
 * [Map extractor](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Xiaomi-Cloud-Map-Extractor) - live map for Xiaomi Vacuums
