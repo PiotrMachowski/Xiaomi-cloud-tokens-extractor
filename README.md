@@ -44,7 +44,7 @@ Execute following command:
 bash <(curl -L https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/raw/master/run_docker.sh)
 ```
 
-> To run this command in HA you have to disable protected mode in addon's settings
+> To run this command in HA you have to disable `protected mode` in addon's settings and restart it
 
 ## Manual run in python
 
