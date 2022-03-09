@@ -35,12 +35,16 @@ Execute following command:
 bash <(curl -L https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/raw/master/run.sh)
 ```
 
-## Docker
+> If installation fails try Docker version
+
+## Docker & Home Assistant (in [SSH & Web Terminal](https://github.com/hassio-addons/addon-ssh))
 
 Execute following command:
 ```bash
 bash <(curl -L https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/raw/master/run_docker.sh)
 ```
+
+> To run this command in HA you have to disable protected mode in addon's settings
 
 ## Manual run in python
 
