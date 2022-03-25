@@ -69,9 +69,15 @@ If you have problems with using this tool try following solutions:
 - Disable network ad blockers (AdGuard, PiHole, etc.)
 - Open 2FA link on the same device that runs Tokens Extractor
 
+## Community Video Tutorials
+
+* [Home Assistant Roborock S7 Integration (Video HOW-TO)](https://youtu.be/dZmjyMfJnCU) - Video Demonstration of Roborock S7 & Home Assistant integratino using Xiaomi Cloud Tokens Extractor, [Map extractor](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Xiaomi-Cloud-Map-Extractor) & [Map card](https://github.com/PiotrMachowski/lovelace-xiaomi-vacuum-map-card)
+
 ## Home Assistant additional tools
 
 * [Map extractor](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Xiaomi-Cloud-Map-Extractor) - live map for Xiaomi Vacuums
 * [Map card](https://github.com/PiotrMachowski/lovelace-xiaomi-vacuum-map-card) - manual vacuum control from a Lovelace card
 
 <a href="https://www.buymeacoffee.com/PiotrMachowski" target="_blank"><img src="https://bmc-cdn.nyc3.digitaloceanspaces.com/BMC-button-images/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
+
+
