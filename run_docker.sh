@@ -8,7 +8,7 @@ curl --silent --fail --show-error --location --remote-name --remote-header-name\
 unzip token_extractor_docker.zip
 cd token_extractor_docker
 docker_image=$(docker build -q .)
-#docker run --rm -it $docker_image
+docker run --rm -it $docker_image
 docker rmi $docker_image
 cd ..
 rm -rf token_extractor_docker token_extractor_docker.zip
