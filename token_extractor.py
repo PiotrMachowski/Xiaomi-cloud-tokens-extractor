@@ -25,7 +25,7 @@ class XiaomiCloudConnector:
         self._session = requests.session()
         self._sign = None
         self._ssecurity = None
-        self._userId = None
+        self.userId = None
         self._cUserId = None
         self._passToken = None
         self._location = None
@@ -69,7 +69,7 @@ class XiaomiCloudConnector:
             valid = "ssecurity" in json_resp and len(str(json_resp["ssecurity"])) > 4
             if valid:
                 self._ssecurity = json_resp["ssecurity"]
-                self._userId = json_resp["userId"]
+                self.userId = json_resp["userId"]
                 self._cUserId = json_resp["cUserId"]
                 self._passToken = json_resp["passToken"]
                 self._location = json_resp["location"]
@@ -117,8 +117,8 @@ class XiaomiCloudConnector:
     def get_devices(self, country, home_id, owner_id):
         url = self.get_api_url(country) + "/v2/home/home_device_list"
         params = {
-            "data": '{"home_owner": ' + str(owner_id) + \
-            ',"home_id": ' + str(home_id) + \
+            "data": '{"home_owner": ' + str(owner_id) +
+            ',"home_id": ' + str(home_id) +
             ',  "limit": 200,  "get_split_device": true, "support_smart_home": true}'
         }
         return self.execute_api_call_encrypted(url, params)
@@ -146,7 +146,7 @@ class XiaomiCloudConnector:
             "MIOT-ENCRYPT-ALGORITHM": "ENCRYPT-RC4",
         }
         cookies = {
-            "userId": str(self._userId),
+            "userId": str(self.userId),
             "yetAnotherServiceToken": str(self._serviceToken),
             "serviceToken": str(self._serviceToken),
             "locale": "en_GB",
@@ -162,11 +162,11 @@ class XiaomiCloudConnector:
         response = self._session.post(url, headers=headers, cookies=cookies, params=fields)
         if response.status_code == 200:
             decoded = self.decrypt_rc4(self.signed_nonce(fields["_nonce"]), response.text)
-            #print(json.dumps(json.loads(decoded), indent=2))
             return json.loads(decoded)
         return None
 
-    def get_api_url(self, country):
+    @staticmethod
+    def get_api_url(country):
         return "https://" + ("" if country == "cn" else (country + ".")) + "api.io.mi.com/app"
 
     def signed_nonce(self, nonce):
@@ -248,7 +248,7 @@ def print_entry(key, value, tab):
         print_tabbed(f'{key + ":": <10}{value}', tab)
 
 
-if __name__ == "__main__":
+def main():
     servers = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
     servers_str = ", ".join(servers)
     print("Username (email or user ID):")
@@ -277,23 +277,23 @@ if __name__ == "__main__":
             homes = connector.get_homes(current_server)
             if homes is not None:
                 for h in homes['result']['homelist']:
-                    hh.append({'home_id':h['id'], 'home_owner':connector._userId})
+                    hh.append({'home_id': h['id'], 'home_owner': connector.userId})
             dev_cnt = connector.get_dev_cnt(current_server)
             if dev_cnt is not None:
                 for h in dev_cnt["result"]["share"]["share_family"]:
-                    hh.append({'home_id':h['home_id'], 'home_owner':h['home_owner']})
+                    hh.append({'home_id': h['home_id'], 'home_owner': h['home_owner']})
 
             if len(hh) == 0:
-                print(f"No homes found for server \"{current_server}\".")
+                print(f'No homes found for server "{current_server}".')
                 continue
 
             for home in hh:
                 devices = connector.get_devices(current_server, home['home_id'], home['home_owner'])
                 if devices is not None:
-                    if len(devices["result"]["device_info"]) == 0:
-                        print(f"No devices found for server \"{current_server}\" @ home \"{home['home_id']}\".")
+                    if devices["result"]["device_info"] is None or len(devices["result"]["device_info"]) == 0:
+                        print(f'No devices found for server "{current_server}" @ home "{home["home_id"]}".')
                         continue
-                    print(f"Devices found for server \"{current_server}\" @ home \"{home['home_id']}\":")
+                    print(f'Devices found for server "{current_server}" @ home "{home["home_id"]}":')
                     for device in devices["result"]["device_info"]:
                         print_tabbed("---------", 3)
                         if "name" in device:
@@ -322,3 +322,7 @@ if __name__ == "__main__":
     print()
     print("Press ENTER to finish")
     input()
+
+
+if __name__ == "__main__":
+    main()
