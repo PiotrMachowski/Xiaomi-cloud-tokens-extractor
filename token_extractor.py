@@ -5,10 +5,11 @@ import json
 import os
 import random
 import time
+from getpass import getpass
 from sys import platform
-from Crypto.Cipher import ARC4
 
 import requests
+from Crypto.Cipher import ARC4
 
 if platform != "win32":
     import readline
@@ -253,7 +254,7 @@ if __name__ == "__main__":
     print("Username (email or user ID):")
     username = input()
     print("Password:")
-    password = input()
+    password = getpass("")
     print(f"Server (one of: {servers_str}) Leave empty to check all available:")
     server = input()
     while server not in ["", *servers]:
