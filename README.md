@@ -66,7 +66,7 @@ python3 token_extractor.py
 If you have problems with using this tool try following solutions:
 - Make yourself sure that you provide correct credentials (_e.g. not ones from Roborock app!_)
 - Remove Cloudflare DNS
-- Disable network ad blockers (AdGuard, PiHole, etc.)
+- Disable network ad blockers (AdGuard, PiHole, etc.) and restrictions (UniFi Country Restriction etc.)
 - Open 2FA link on the same device that runs Tokens Extractor
 
 ## Home Assistant additional tools
