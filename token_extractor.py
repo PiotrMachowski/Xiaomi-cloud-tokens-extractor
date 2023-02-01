@@ -265,7 +265,14 @@ def main():
     print()
     if not server == "":
         servers = [server]
+    run(username, password, servers)
+    
+    print()
+    print("Press ENTER to finish")
+    input()
 
+
+def run(username, password, servers):
     connector = XiaomiCloudConnector(username, password)
     print("Logging in...")
     logged = connector.login()
@@ -318,10 +325,6 @@ def main():
                     print(f"Unable to get devices from server {current_server}.")
     else:
         print("Unable to log in.")
-
-    print()
-    print("Press ENTER to finish")
-    input()
 
 
 if __name__ == "__main__":
