@@ -5,7 +5,6 @@ import json
 import os
 import random
 import time
-from getpass import getpass
 from sys import platform
 
 import requests
@@ -14,7 +13,6 @@ from Crypto.Cipher import ARC4
 from rich import print, prompt
 from rich.progress import track
 from rich.prompt import Prompt
-from rich.table import Table
 from tabulate import tabulate
 
 if platform != "win32":
@@ -260,12 +258,7 @@ def print_tabbed(value, tab):
     print(" " * tab + value)
 
 
-def print_entry(key, value, tab):
-    if value:
-        print_tabbed(f'{key + ":": <10}{value}', tab)
-
 server_choices = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
-
 
 def server_choice_callback(server: str):
     if server in ['', None, 'all']:
