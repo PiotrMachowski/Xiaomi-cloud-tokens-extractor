@@ -9,7 +9,13 @@ from getpass import getpass
 from sys import platform
 
 import requests
+import typer
 from Crypto.Cipher import ARC4
+from rich import print, prompt
+from rich.progress import track
+from rich.prompt import Prompt
+from rich.table import Table
+from tabulate import tabulate
 
 if platform != "win32":
     import readline
@@ -239,6 +245,17 @@ class XiaomiCloudConnector:
         return r.encrypt(base64.b64decode(payload))
 
 
+def flatten_dict(d, parent_key='', sep='_'):
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
 def print_tabbed(value, tab):
     print(" " * tab + value)
 
@@ -247,32 +264,35 @@ def print_entry(key, value, tab):
     if value:
         print_tabbed(f'{key + ":": <10}{value}', tab)
 
+server_choices = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
 
-def main():
-    servers = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
-    servers_str = ", ".join(servers)
-    print("Username (email or user ID):")
-    username = input()
-    print("Password:")
-    password = getpass("")
-    print(f"Server (one of: {servers_str}) Leave empty to check all available:")
-    server = input()
-    while server not in ["", *servers]:
-        print(f"Invalid server provided. Valid values: {servers_str}")
-        print("Server:")
-        server = input()
 
-    print()
-    if not server == "":
-        servers = [server]
+def server_choice_callback(server: str):
+    if server in ['', None, 'all']:
+        return server_choices
+    return [server]
+
+
+def main(username: str = typer.Argument(''),
+         password: str = typer.Argument(''),
+         server: str = typer.Option(server_choices, help="Choose a server or leave empty to check them all", callback=server_choice_callback)):
+
+    if not username:
+        username = Prompt.ask("Username")
+    if not password:
+        password = Prompt.ask("Password", password=True)
+    if set(server) -  set([*server_choices, 'all']):
+        servers = server_choice_callback(Prompt.ask("Choose a server or leave empty to check them all", choices=[*server_choices, '', 'all']))
 
     connector = XiaomiCloudConnector(username, password)
     print("Logging in...")
     logged = connector.login()
+
     if logged:
         print("Logged in.")
         print()
-        for current_server in servers:
+        cols = ['name','did','mac','localip','token','model']
+        for current_server in track(servers, description=f"Checking chosen server{'s' if len(servers)>1 else ''}"):
             hh = []
             homes = connector.get_homes(current_server)
             if homes is not None:
@@ -296,22 +316,7 @@ def main():
                     print(f'Devices found for server "{current_server}" @ home "{home["home_id"]}":')
                     for device in devices["result"]["device_info"]:
                         print_tabbed("---------", 3)
-                        if "name" in device:
-                            print_entry("NAME", device["name"], 3)
-                        if "did" in device:
-                            print_entry("ID", device["did"], 3)
-                            if "blt" in device["did"]:
-                                beaconkey = connector.get_beaconkey(current_server, device["did"])
-                                if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
-                                    print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
-                        if "mac" in device:
-                            print_entry("MAC", device["mac"], 3)
-                        if "localip" in device:
-                            print_entry("IP", device["localip"], 3)
-                        if "token" in device:
-                            print_entry("TOKEN", device["token"], 3)
-                        if "model" in device:
-                            print_entry("MODEL", device["model"], 3)
+                        print(tabulate([(k.upper(), v) for k,v in flatten_dict(device).items()], tablefmt="simple_outline"))
                     print_tabbed("---------", 3)
                     print()
                 else:
@@ -320,9 +325,9 @@ def main():
         print("Unable to log in.")
 
     print()
-    print("Press ENTER to finish")
-    input()
+    prompt.Confirm("Press ENTER to finish")
+
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)
