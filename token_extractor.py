@@ -9,7 +9,11 @@ from getpass import getpass
 from sys import platform
 
 import requests
-from Crypto.Cipher import ARC4
+
+try:
+    from Crypto.Cipher import ARC4
+except ModuleNotFoundError:
+    from Cryptodome.Cipher import ARC4
 
 if platform != "win32":
     import readline
