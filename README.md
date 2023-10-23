@@ -24,7 +24,7 @@ You will need to provide Xiaomi Home credentials (_not ones from Roborock app_):
 
 In return all of your devices connected to account will be listed, together with their name and IP address.
 
-## Windows
+## Windows or Wine
 Download and run [token_extractor.exe](https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/releases/latest/download/token_extractor.exe).
 
 ## Linux & Home Assistant (in [SSH & Web Terminal](https://github.com/hassio-addons/addon-ssh))
