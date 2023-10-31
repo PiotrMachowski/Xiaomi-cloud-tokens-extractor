@@ -1,3 +1,4 @@
 requests
 pycryptodome
 charset-normalizer
+readline
