@@ -251,12 +251,18 @@ def print_entry(key, value, tab):
 def main():
     servers = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
     servers_str = ", ".join(servers)
-    print("Username (email or user ID):")
-    username = input()
-    print("Password:")
-    password = getpass("")
-    print(f"Server (one of: {servers_str}) Leave empty to check all available:")
-    server = input()
+    username = os.getenv('XIAOMI_USERNAME')
+    if username is None:
+        print("Username (email or user ID):")
+        username = input()
+    password = os.getenv('XIAOMI_PASSWORD')
+    if password is None:
+        print("Password:")
+        password = getpass("")
+    server = os.getenv('XIAOMI_SERVER')
+    if server is None:
+        print(f"Server (one of: {servers_str}) Leave empty to check all available:")
+        server = input()
     while server not in ["", *servers]:
         print(f"Invalid server provided. Valid values: {servers_str}")
         print("Server:")
