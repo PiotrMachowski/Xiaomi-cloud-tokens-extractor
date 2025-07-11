@@ -142,3 +142,11 @@ dmypy.json
 cython_debug/
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# Credential files
+*_xiaomi_creds_*.json
+xiaomi_creds*.json
+
+# Backup and patch files  
+token_extractor_backup.py
+full_changes.patch
