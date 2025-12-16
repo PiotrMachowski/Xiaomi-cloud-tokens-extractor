@@ -435,9 +435,34 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         }
         _LOGGER.debug("GET /identity/list params=%s", list_params)
         r = self._session.get("https://account.xiaomi.com/identity/list", params=list_params, headers=headers)
-        _LOGGER.debug("identity/list status=%s", r.status_code)
+        _LOGGER.debug("identity/list status=%s body=%s", r.status_code, r.text[:1000] if r.text else "(empty)")
 
-        # 3) Request email ticket
+        # Parse identity/list response to determine verification method
+        try:
+            identity_info = self.to_json(r.text) if r.text.startswith("&&&START&&&") else r.json()
+        except Exception:
+            identity_info = {}
+
+        # Parse options and flag from identity/list
+        options = identity_info.get("options", [])
+        flag = identity_info.get("flag", 8)  # default to email
+        _LOGGER.debug("identity/list options=%s flag=%s", options, flag)
+
+        # According to hass-xiaomi-miot: flag 4 -> phone, flag 8 -> email
+        # Both send and verify endpoints must match
+        if flag == 4:
+            verification_type = "phone"
+            send_endpoint = "/identity/auth/sendPhoneTicket"
+            verify_endpoint = "/identity/auth/verifyPhone"
+        else:
+            verification_type = "email"
+            send_endpoint = "/identity/auth/sendEmailTicket"
+            verify_endpoint = "/identity/auth/verifyEmail"
+        flag_value = str(flag)
+
+        _LOGGER.debug("Using %s verification (flag=%s)", verification_type, flag_value)
+
+        # 3) Request verification ticket
         send_params = {
             "_dc": str(int(time.time() * 1000)),
             "sid": "xiaomiio",
@@ -451,54 +476,133 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
             "_json": "true",
             "ick": self._session.cookies.get("ick", "")
         }
-        _LOGGER.debug("sendEmailTicket POST url=https://account.xiaomi.com/identity/auth/sendEmailTicket params=%s", send_params)
-        _LOGGER.debug("sendEmailTicket data=%s", send_data)
-        r = self._session.post("https://account.xiaomi.com/identity/auth/sendEmailTicket",
-                               params=send_params, data=send_data, headers=headers)
+        send_url = f"https://account.xiaomi.com{send_endpoint}"
+        _LOGGER.debug("sendTicket POST url=%s params=%s", send_url, send_params)
+        _LOGGER.debug("sendTicket data=%s", send_data)
+        r = self._session.post(send_url, params=send_params, data=send_data, headers=headers)
+        _LOGGER.debug("sendTicket response body=%s", r.text[:500] if r.text else "(empty)")
         try:
-            jr = r.json()
+            jr = self.to_json(r.text) if r.text.startswith("&&&START&&&") else r.json()
         except Exception:
             jr = {}
-        _LOGGER.debug("sendEmailTicket response status=%s json=%s", r.status_code, jr)
+        _LOGGER.debug("sendTicket response status=%s json=%s", r.status_code, jr)
 
-        # 4) Ask user for the email code and verify
+        # Handle CAPTCHA requirement for sendTicket
+        max_captcha_retries = 3
+        captcha_retry = 0
+        while jr.get("code") == 87001 and captcha_retry < max_captcha_retries:
+            captcha_retry += 1
+            captcha_url = jr.get("captchaUrl", "")
+            if captcha_url:
+                _LOGGER.debug("sendTicket requires CAPTCHA (attempt %d): %s", captcha_retry, captcha_url)
+                # Fetch fresh captcha each time
+                captcha_code = self.handle_captcha(captcha_url)
+                if not captcha_code:
+                    _LOGGER.error("Could not solve captcha for sendTicket.")
+                    return False
+                # Retry sendTicket with captcha - use 'icode' parameter for sendTicket endpoints
+                send_data["icode"] = captcha_code
+                send_params["_dc"] = str(int(time.time() * 1000))  # Fresh timestamp
+                r = self._session.post(send_url, params=send_params, data=send_data, headers=headers)
+                _LOGGER.debug("sendTicket retry response body=%s", r.text[:500] if r.text else "(empty)")
+                try:
+                    jr = self.to_json(r.text) if r.text.startswith("&&&START&&&") else r.json()
+                except Exception:
+                    jr = {}
+                _LOGGER.debug("sendTicket retry response json=%s", jr)
+            else:
+                break
+
+        if jr.get("code") == 87001:
+            print_if_interactive(f"{Fore.RED}CAPTCHA verification failed after {max_captcha_retries} attempts.")
+            return False
+
+        # Check if sendTicket succeeded
+        if jr.get("code") not in (0, None):
+            _LOGGER.error("sendTicket failed with code=%s desc=%s", jr.get("code"), jr.get("desc", ""))
+            # If phone verification failed, try email as fallback
+            if verification_type == "phone":
+                _LOGGER.debug("Phone ticket failed, trying email verification as fallback")
+                print_if_interactive(f"{Fore.YELLOW}Phone verification failed, trying email verification...")
+                verification_type = "email"
+                send_endpoint = "/identity/auth/sendEmailTicket"
+                verify_endpoint = "/identity/auth/verifyEmail"
+                flag_value = "8"
+                send_url = f"https://account.xiaomi.com{send_endpoint}"
+                # Reset send_data for email
+                send_data = {
+                    "retry": "0",
+                    "icode": "",
+                    "_json": "true",
+                    "ick": self._session.cookies.get("ick", "")
+                }
+                send_params["_dc"] = str(int(time.time() * 1000))
+                r = self._session.post(send_url, params=send_params, data=send_data, headers=headers)
+                try:
+                    jr = self.to_json(r.text) if r.text.startswith("&&&START&&&") else r.json()
+                except Exception:
+                    jr = {}
+                _LOGGER.debug("sendEmailTicket fallback response json=%s", jr)
+                if jr.get("code") not in (0, None):
+                    _LOGGER.error("Email fallback also failed with code=%s", jr.get("code"))
+                    return False
+
+        # 4) Ask user for the verification code
         if args.non_interactive:
-            parser.error("Email verification code required, rerun without --non_interactive")
+            parser.error("Verification code required, rerun without --non_interactive")
 
-        print_if_interactive(f"{Fore.YELLOW}Two factor authentication required, please provide the code from the email.")
+        if verification_type == "email":
+            print_if_interactive(f"{Fore.YELLOW}Two factor authentication required, please provide the code from the email.")
+        else:
+            print_if_interactive(f"{Fore.YELLOW}Two factor authentication required, please provide the code from SMS.")
         print_if_interactive()
         print_if_interactive("2FA Code:")
         code = input().strip()
         print_if_interactive()
 
         verify_params = {
-            "_flag": "8",
+            "_dc": str(int(time.time() * 1000)),
             "_json": "true",
             "sid": "xiaomiio",
             "context": list_params["context"],
-            "mask": "0",
             "_locale": "en_US"
         }
         verify_data = {
-            "_flag": "8",
+            "_flag": flag_value,
             "ticket": code,
-            "trust": "false",
+            "trust": "true",
             "_json": "true",
             "ick": self._session.cookies.get("ick", "")
         }
-        r = self._session.post("https://account.xiaomi.com/identity/auth/verifyEmail",
-                               params=verify_params, data=verify_data, headers=headers)
+        verify_url = f"https://account.xiaomi.com{verify_endpoint}"
+        _LOGGER.debug("verify POST url=%s params=%s", verify_url, verify_params)
+        _LOGGER.debug("verify POST data=%s", verify_data)
+
+        r = self._session.post(verify_url, params=verify_params, data=verify_data, headers=headers)
+        _LOGGER.debug("verifyEmail response status=%s headers=%s", r.status_code, dict(r.headers))
+        _LOGGER.debug("verifyEmail response body=%s", r.text[:1000] if r.text else "(empty)")
         if r.status_code != 200:
             _LOGGER.error("verifyEmail failed: status=%s body=%s", r.status_code, r.text[:500])
             return False
 
         try:
-            jr = r.json()
-            _LOGGER.debug("verifyEmail response status=%s json=%s", r.status_code, jr)
-            finish_loc = jr.get("location")
-        except Exception:
+            # Response may have &&&START&&& prefix, use to_json to handle it
+            jr = self.to_json(r.text) if r.text.startswith("&&&START&&&") else r.json()
+            _LOGGER.debug("verifyEmail response json=%s", jr)
+
+            # code=0 means success with location
+            # code=2 might mean "pending/continue" - try to proceed to result/check
+            if jr.get("code") == 0:
+                finish_loc = jr.get("location")
+            elif jr.get("code") == 2:
+                _LOGGER.debug("verifyEmail returned code=2, trying result/check directly")
+                finish_loc = None  # Will trigger fallback to result/check
+            else:
+                _LOGGER.error("verifyEmail returned unexpected code=%s", jr.get("code"))
+                return False
+        except Exception as e:
             # Non-JSON or empty; try to extract from headers or body
-            _LOGGER.debug("verifyEmail returned non-JSON, attempting fallback extraction.")
+            _LOGGER.debug("verifyEmail JSON parse failed: %s, attempting fallback extraction.", e)
             finish_loc = r.headers.get("Location")
             if not finish_loc and r.text:
                 m = re.search(r'https://account\.xiaomi\.com/identity/result/check\?[^"\']+', r.text)
@@ -515,8 +619,16 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
                 allow_redirects=False
             )
             _LOGGER.debug("result/check (fallback) status=%s hop-> %s", r0.status_code, r0.headers.get("Location"))
+            _LOGGER.debug("result/check (fallback) body=%s", r0.text[:1000] if r0.text else "(empty)")
             if r0.status_code in (301, 302) and r0.headers.get("Location"):
                 finish_loc = r0.url if "serviceLoginAuth2/end" in r0.url else r0.headers["Location"]
+            elif r0.status_code == 200:
+                # Check if verification is still pending (code=2) or actually complete
+                try:
+                    jr0 = self.to_json(r0.text) if r0.text.startswith("&&&START&&&") else {}
+                    _LOGGER.debug("result/check json=%s", jr0)
+                except:
+                    jr0 = {}
 
         if not finish_loc:
             _LOGGER.error("Unable to determine finish location after verifyEmail.")
