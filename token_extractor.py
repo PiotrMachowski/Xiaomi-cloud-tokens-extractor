@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 from colorama import Fore, Style, init
+import qrcode
 
 try:
     from Crypto.Cipher import ARC4
@@ -682,6 +683,7 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
             print_if_interactive(f"{Fore.BLUE}Alternatively you can visit the following URL:")
             print_if_interactive(f"{Fore.BLUE}  {self._login_url}")
             print_if_interactive()
+            present_qrcode_terminal(self._login_url)
             return True
         else:
             _LOGGER.error("login_step_2: HTTP status: %s; Response: %s", response.status_code, response.text[:500])
@@ -823,7 +825,20 @@ def present_image_image(
             _LOGGER.debug(e2)
             print_if_interactive(message_manually_open_file.format(tmp_path))
 
-
+def present_qrcode_terminal(url: str) -> None:
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.ERROR_CORRECT_L,
+            box_size=5,
+            border=1,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        qr.print_ascii(invert=True)
+    except Exception as e:
+        _LOGGER.debug(f"Failed to generate QR code in terminal: {e}")
+    
 def main() -> None:
     print_banner()
     if args.non_interactive:
