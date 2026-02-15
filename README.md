@@ -38,6 +38,10 @@ bash <(curl -L https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/r
 If you have [`uv`](https://docs.astral.sh/uv/):
 ```bash
 uv run https://raw.githubusercontent.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor/refs/heads/master/token_extractor.py
+# or from source
+git clone https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor.git
+cd Xiaomi-cloud-tokens-extractor
+uv run token_extractor.py
 ```
 
 > If installation fails try Docker version
