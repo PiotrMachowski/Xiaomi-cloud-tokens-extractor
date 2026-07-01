@@ -31,6 +31,7 @@ if sys.platform != "win32":
     import readline
 
 SERVERS = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
+SESSION_CACHE_FILE = ".xiaomi-cloud-session.json"
 NAME_TO_LEVEL = {
     "CRITICAL": logging.CRITICAL,
     "FATAL": logging.FATAL,
@@ -51,8 +52,6 @@ parser.add_argument("-l", "--log_level", required=False, help="Log level", defau
 parser.add_argument("-o", "--output", required=False, help="Output file")
 parser.add_argument("--host", required=False, help="Host")
 args = parser.parse_args()
-if args.non_interactive and (not args.username or not args.password):
-    parser.error("You need to specify username and password or run as interactive.")
 
 init(autoreset=True)
 
@@ -94,10 +93,77 @@ class XiaomiCloudConnector(ABC):
         self._ssecurity = None
         self.userId = None
         self._serviceToken = None
+        self._session_cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SESSION_CACHE_FILE)
 
     @abstractmethod
     def login(self) -> bool:
         pass
+
+    def load_cached_login(self) -> bool:
+        if not os.path.exists(self._session_cache_path):
+            return False
+        try:
+            with open(self._session_cache_path, encoding="utf-8") as cache_file:
+                cache = json.load(cache_file)
+
+            self.userId = cache["userId"]
+            self._ssecurity = cache["ssecurity"]
+            self._serviceToken = cache["serviceToken"]
+            self._session.cookies.clear()
+            for cookie_data in cache.get("cookies", []):
+                self._session.cookies.set(
+                    cookie_data["name"],
+                    cookie_data["value"],
+                    domain=cookie_data.get("domain", ""),
+                    path=cookie_data.get("path", "/"),
+                )
+            return bool(self.userId and self._ssecurity and self._serviceToken)
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            _LOGGER.debug("Unable to load cached login: %s", e)
+            return False
+
+    def save_cached_login(self) -> None:
+        if not (self.userId and self._ssecurity and self._serviceToken):
+            return
+
+        cache = {
+            "userId": self.userId,
+            "ssecurity": self._ssecurity,
+            "serviceToken": self._serviceToken,
+            "savedAt": int(time.time()),
+            "cookies": [
+                {
+                    "name": cookie.name,
+                    "value": cookie.value,
+                    "domain": cookie.domain,
+                    "path": cookie.path,
+                }
+                for cookie in self._session.cookies
+            ],
+        }
+        with open(self._session_cache_path, "w", encoding="utf-8") as cache_file:
+            json.dump(cache, cache_file, indent=2)
+        try:
+            os.chmod(self._session_cache_path, 0o600)
+        except OSError as e:
+            _LOGGER.debug("Unable to restrict session cache permissions: %s", e)
+
+    def clear_cached_login(self) -> None:
+        try:
+            os.remove(self._session_cache_path)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            _LOGGER.debug("Unable to remove cached login: %s", e)
+
+    def validate_cached_login(self) -> bool:
+        if not (self.userId and self._ssecurity and self._serviceToken):
+            return False
+        servers_to_validate = [args.server] if args.server else SERVERS
+        for server in servers_to_validate:
+            if self.get_homes(server) is not None:
+                return True
+        return False
 
     def get_homes(self, country):
         url = self.get_api_url(country) + "/v2/homeroom/gethome"
@@ -244,6 +310,9 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         self._code = None
 
     def login(self) -> bool:
+        if args.non_interactive and (not args.username or not args.password):
+            parser.error("You need to specify username and password or run as interactive.")
+
         if args.username:
             self._username = args.username
         else:
@@ -826,22 +895,37 @@ def present_image_image(
 
 def main() -> None:
     print_banner()
-    if args.non_interactive:
-        connector = PasswordXiaomiCloudConnector()
-    else:
-        print_if_interactive("Please select a way to log in:")
-        print_if_interactive(f" p{Fore.BLUE} - using password")
-        print_if_interactive(f" q{Fore.BLUE} - using QR code")
-        log_in_method = ""
-        while not log_in_method in ["P", "Q"]:
-            log_in_method = input("p/q: ").upper()
-        if log_in_method == "P":
+    connector = PasswordXiaomiCloudConnector()
+    logged = False
+
+    if connector.load_cached_login():
+        print_if_interactive(f"{Fore.BLUE}Using cached login...")
+        if connector.validate_cached_login():
+            logged = True
+        else:
+            print_if_interactive(f"{Fore.YELLOW}Cached login is expired or invalid.")
+            connector.clear_cached_login()
+
+    if not logged:
+        if args.non_interactive:
             connector = PasswordXiaomiCloudConnector()
         else:
-            connector = QrCodeXiaomiCloudConnector()
-        print_if_interactive()
+            print_if_interactive("Please select a way to log in:")
+            print_if_interactive(f" p{Fore.BLUE} - using password")
+            print_if_interactive(f" q{Fore.BLUE} - using QR code")
+            log_in_method = ""
+            while not log_in_method in ["P", "Q"]:
+                log_in_method = input("p/q: ").upper()
+            if log_in_method == "P":
+                connector = PasswordXiaomiCloudConnector()
+            else:
+                connector = QrCodeXiaomiCloudConnector()
+            print_if_interactive()
 
-    logged = connector.login()
+        logged = connector.login()
+        if logged:
+            connector.save_cached_login()
+
     if logged:
         print_if_interactive(f"{Fore.GREEN}Logged in.")
         print_if_interactive()
