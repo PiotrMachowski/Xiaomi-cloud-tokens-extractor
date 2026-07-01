@@ -117,6 +117,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Xiaomi Cloud session cache (contains login tokens)
+.xiaomi-cloud-session.json
+
 # Spyder project settings
 .spyderproject
 .spyproject
