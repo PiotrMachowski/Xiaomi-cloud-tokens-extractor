@@ -46,13 +46,26 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-ni", "--non_interactive", required=False, help="Non-interactive mode", action="store_true")
 parser.add_argument("-u", "--username", required=False, help="Username")
 parser.add_argument("-p", "--password", required=False, help="Password")
+parser.add_argument("--auth-method", required=False, choices=["password", "qr"], help="Authentication method")
+parser.add_argument("--qr-output", required=False, help="Write the QR login image to this file")
 parser.add_argument("-s", "--server", required=False, help="Server", choices=[*SERVERS, ""])
 parser.add_argument("-l", "--log_level", required=False, help="Log level", default="CRITICAL", choices=list(NAME_TO_LEVEL.keys()))
 parser.add_argument("-o", "--output", required=False, help="Output file")
 parser.add_argument("--host", required=False, help="Host")
 args = parser.parse_args()
-if args.non_interactive and (not args.username or not args.password):
-    parser.error("You need to specify username and password or run as interactive.")
+if args.non_interactive:
+    if args.auth_method is None:
+        args.auth_method = "password"
+    if args.auth_method == "password" and (not args.username or not args.password):
+        parser.error("You need to specify username and password or run as interactive.")
+    if args.auth_method == "qr" and not args.qr_output:
+        parser.error("Non-interactive QR authentication requires --qr-output.")
+    if args.auth_method == "qr" and (args.username or args.password):
+        parser.error("Username and password cannot be used with QR authentication.")
+    if args.auth_method != "qr" and args.qr_output is not None:
+        parser.error("--qr-output requires --auth-method qr.")
+elif args.auth_method is not None or args.qr_output is not None:
+    parser.error("--auth-method and --qr-output require --non_interactive.")
 
 init(autoreset=True)
 
@@ -614,20 +627,25 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
         self._long_polling_url = None
 
     def login(self) -> bool:
+        self.remove_qr_output()
 
         if not self.login_step_1():
+            self.remove_qr_output()
             print_if_interactive(f"{Fore.RED}Unable to get login message.")
             return False
 
         if not self.login_step_2():
+            self.remove_qr_output()
             print_if_interactive(f"{Fore.RED}Unable to get login QR Image.")
             return False
 
         if not self.login_step_3():
+            self.remove_qr_output()
             print_if_interactive(f"{Fore.RED}Unable to login.")
             return False
 
         if not self.login_step_4():
+            self.remove_qr_output()
             print_if_interactive(f"{Fore.RED}Unable to get service token.")
             return False
 
@@ -648,7 +666,7 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
         }
 
         response = self._session.get(url, params=data)
-        _LOGGER.debug(response.text)
+        _LOGGER.debug("login_step_1: HTTP status: %s", response.status_code)
 
         if response.status_code == 200:
             response_data = self.to_json(response.text)
@@ -663,7 +681,6 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
     def login_step_2(self) -> bool:
         _LOGGER.debug("login_step_2")
         url = self._qr_image_url
-        _LOGGER.debug("login_step_2: Image URL: %s", url)
 
         response = self._session.get(url)
 
@@ -672,28 +689,36 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
         if valid:
             print_if_interactive(f"{Fore.BLUE}Please scan the following QR code to log in.")
 
-            present_image_image(
-                response.content,
-                message_url = f"QR code URL: {Fore.BLUE}http://{args.host or '127.0.0.1'}:31415",
-                message_file_saved = "QR code image saved at: {}",
-                message_manually_open_file = "Please open {} and scan the QR code."
-            )
+            if args.non_interactive:
+                try:
+                    write_private_file(args.qr_output, response.content)
+                except OSError as error:
+                    _LOGGER.error("Unable to write QR code image: %s", error)
+                    return False
+            else:
+                present_image_image(
+                    response.content,
+                    message_url = f"QR code URL: {Fore.BLUE}http://{args.host or '127.0.0.1'}:31415",
+                    message_file_saved = "QR code image saved at: {}",
+                    message_manually_open_file = "Please open {} and scan the QR code."
+                )
             print_if_interactive()
             print_if_interactive(f"{Fore.BLUE}Alternatively you can visit the following URL:")
             print_if_interactive(f"{Fore.BLUE}  {self._login_url}")
             print_if_interactive()
             return True
         else:
-            _LOGGER.error("login_step_2: HTTP status: %s; Response: %s", response.status_code, response.text[:500])
+            _LOGGER.error("login_step_2: HTTP status: %s", response.status_code)
         return False
 
     def login_step_3(self) -> bool:
         _LOGGER.debug("login_step_3")
 
         url = self._long_polling_url
-        _LOGGER.debug("Long polling URL: " + url)
+        _LOGGER.debug("Starting QR login long polling")
 
         start_time = time.time()
+        response = None
         # Start long polling
         while True:
             try:
@@ -705,7 +730,7 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
                     break
                 continue
             except requests.exceptions.RequestException as e:
-                _LOGGER.error(f"An error occurred: {e}")
+                _LOGGER.error("Long polling request failed: %s", type(e).__name__)
                 break
 
             if response.status_code == 200:
@@ -713,15 +738,12 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
             else:
                 _LOGGER.error("Long polling failed, retrying...")
 
-        if response.status_code != 200:
-            _LOGGER.error("Long polling failed with status code: " + str(response.status_code))
+        if response is None or response.status_code != 200:
+            status_code = response.status_code if response is not None else "unavailable"
+            _LOGGER.error("Long polling failed with status code: %s", status_code)
             return False
 
-        _LOGGER.debug("Login successful!")
-        _LOGGER.debug("Response data:")
-
         response_data = self.to_json(response.text)
-        _LOGGER.debug(response_data)
 
         self.userId = response_data["userId"]
         self._ssecurity = response_data["ssecurity"]
@@ -729,11 +751,7 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
         self._pass_token = response_data["passToken"]
         self._location = response_data["location"]
 
-        _LOGGER.debug("User ID: " + str(self.userId))
-        _LOGGER.debug("Ssecurity: " + str(self._ssecurity))
-        _LOGGER.debug("CUser ID: " + str(self._cUserId))
-        _LOGGER.debug("Pass token: " + str(self._pass_token))
-        _LOGGER.debug("Pass token: " + str(self._location))
+        _LOGGER.debug("QR authentication response accepted")
 
         return True
 
@@ -749,9 +767,23 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
         if response.status_code != 200:
             return False
 
-        self._serviceToken = response.cookies["serviceToken"]
-        _LOGGER.debug("Service token: " + str(self._serviceToken))
+        self._serviceToken = response.cookies.get("serviceToken")
+        if not self._serviceToken:
+            _LOGGER.error("Service token was not returned")
+            return False
+        _LOGGER.debug("Service token received")
         return True
+
+    @staticmethod
+    def remove_qr_output() -> None:
+        if not args.non_interactive or not args.qr_output:
+            return
+        try:
+            os.unlink(args.qr_output)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            _LOGGER.error("Unable to remove stale QR code image: %s", error)
 
 
 def print_if_interactive(value: str="") -> None:
@@ -799,6 +831,30 @@ def start_image_server(image: bytes) -> None:
     thread.start()
 
 
+def write_private_file(path: str, content: bytes) -> None:
+    target_path = os.path.abspath(path)
+    target_dir = os.path.dirname(target_path)
+    file_descriptor, temporary_path = tempfile.mkstemp(
+        dir=target_dir,
+        prefix=f".{os.path.basename(target_path)}.",
+    )
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(file_descriptor, 0o600)
+        with os.fdopen(file_descriptor, "wb") as output_file:
+            file_descriptor = -1
+            output_file.write(content)
+        os.replace(temporary_path, target_path)
+    except Exception:
+        if file_descriptor >= 0:
+            os.close(file_descriptor)
+        try:
+            os.unlink(temporary_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def present_image_image(
         image_content: bytes,
         message_url: str,
@@ -824,10 +880,13 @@ def present_image_image(
             print_if_interactive(message_manually_open_file.format(tmp_path))
 
 
-def main() -> None:
+def main() -> int:
     print_banner()
     if args.non_interactive:
-        connector = PasswordXiaomiCloudConnector()
+        if args.auth_method == "qr":
+            connector = QrCodeXiaomiCloudConnector()
+        else:
+            connector = PasswordXiaomiCloudConnector()
     else:
         print_if_interactive("Please select a way to log in:")
         print_if_interactive(f" p{Fore.BLUE} - using password")
@@ -897,15 +956,17 @@ def main() -> None:
                     print_if_interactive(f"{Fore.RED}Unable to get devices from server {current_server}.")
             output.append({"server": current_server, "homes": all_homes})
         if args.output:
-            with open(args.output, "w") as f:
-                f.write(json.dumps(output, indent=4))
+            write_private_file(args.output, json.dumps(output, indent=4).encode())
     else:
         print_if_interactive(f"{Fore.RED}Unable to log in.")
+        if args.non_interactive and args.auth_method == "qr":
+            return 1
 
     if not args.non_interactive:
         print_if_interactive()
         print_if_interactive("Press ENTER to finish")
         input()
+    return 0
 
 
 def get_servers_to_check() -> list[str]:
@@ -932,4 +993,4 @@ def get_servers_to_check() -> list[str]:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
