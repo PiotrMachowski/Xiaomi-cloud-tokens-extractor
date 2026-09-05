@@ -42,6 +42,16 @@ NAME_TO_LEVEL = {
     "NOTSET": logging.NOTSET,
 }
 
+
+def parse_mac_address(value: str) -> str:
+    compact = re.fullmatch(r"[0-9A-Fa-f]{12}", value)
+    colon_separated = re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", value)
+    hyphen_separated = re.fullmatch(r"(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}", value)
+    if compact is None and colon_separated is None and hyphen_separated is None:
+        raise argparse.ArgumentTypeError("must be a valid 48-bit MAC address")
+    return re.sub(r"[:-]", "", value).upper()
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-ni", "--non_interactive", required=False, help="Non-interactive mode", action="store_true")
 parser.add_argument("-u", "--username", required=False, help="Username")
@@ -50,11 +60,18 @@ parser.add_argument("-s", "--server", required=False, help="Server", choices=[*S
 parser.add_argument("-l", "--log_level", required=False, help="Log level", default="CRITICAL", choices=list(NAME_TO_LEVEL.keys()))
 parser.add_argument("-o", "--output", required=False, help="Output file")
 parser.add_argument("--host", required=False, help="Host")
+parser.add_argument("--target-mac", required=False, type=parse_mac_address, help="Only retrieve the BLE key for this MAC address")
+parser.add_argument("--key-output", required=False, help="Write the targeted BLE key to a new owner-only file")
 args = parser.parse_args()
 if args.non_interactive and (not args.username or not args.password):
     parser.error("You need to specify username and password or run as interactive.")
 
 init(autoreset=True)
+
+if (args.target_mac is None) != (args.key_output is None):
+    parser.error("--target-mac and --key-output must be used together.")
+if args.target_mac is not None and not args.non_interactive:
+    parser.error("Targeted BLE key output requires --non_interactive.")
 
 class ColorFormatter(logging.Formatter):
     COLORS = {
@@ -779,6 +796,27 @@ ___ ____ _  _ ____ _  _ ____    ____ _  _ ___ ____ ____ ____ ___ ____ ____
     """)
 
 
+def write_new_private_text_file(path: str, content: str) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    file_descriptor = os.open(path, flags, 0o600)
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(file_descriptor, 0o600)
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as output_file:
+            file_descriptor = -1
+            output_file.write(content)
+    except Exception:
+        if file_descriptor >= 0:
+            os.close(file_descriptor)
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def start_image_server(image: bytes) -> None:
     class ImgHttpHandler(BaseHTTPRequestHandler):
 
@@ -824,7 +862,7 @@ def present_image_image(
             print_if_interactive(message_manually_open_file.format(tmp_path))
 
 
-def main() -> None:
+def main() -> int:
     print_banner()
     if args.non_interactive:
         connector = PasswordXiaomiCloudConnector()
@@ -842,12 +880,16 @@ def main() -> None:
         print_if_interactive()
 
     logged = connector.login()
+    if not logged and args.target_mac is not None:
+        return 1
     if logged:
         print_if_interactive(f"{Fore.GREEN}Logged in.")
         print_if_interactive()
         servers_to_check = get_servers_to_check()
         print_if_interactive()
         output = []
+        target_found = False
+        key_written = False
         for current_server in servers_to_check:
             all_homes = []
             homes = connector.get_homes(current_server)
@@ -871,6 +913,11 @@ def main() -> None:
                         continue
                     print_if_interactive(f'Devices found for server "{current_server}" @ home "{home["home_id"]}":')
                     for device in devices["result"]["device_info"]:
+                        if args.target_mac is not None:
+                            device_mac = re.sub(r"[:-]", "", str(device.get("mac", ""))).upper()
+                            if device_mac != args.target_mac:
+                                continue
+                            target_found = True
                         device_data = {**device}
                         print_tabbed(f"{Fore.BLUE}---------", 3)
                         if "name" in device:
@@ -879,9 +926,20 @@ def main() -> None:
                             print_entry("ID", device["did"], 3)
                             if "blt" in device["did"]:
                                 beaconkey = connector.get_beaconkey(current_server, device["did"])
-                                if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
-                                    print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
+                                if beaconkey and "result" in beaconkey and beaconkey["result"].get("beaconkey"):
+                                    beacon_key = str(beaconkey["result"]["beaconkey"])
+                                    print_entry("BLE KEY", beacon_key, 3)
                                     device_data["BLE_DATA"] = beaconkey["result"]
+                                    if args.key_output and not key_written:
+                                        try:
+                                            write_new_private_text_file(
+                                                args.key_output,
+                                                beacon_key + "\n",
+                                            )
+                                        except OSError as error:
+                                            _LOGGER.error("Unable to write BLE key: %s", error)
+                                            return 1
+                                        key_written = True
                         if "mac" in device:
                             print_entry("MAC", device["mac"], 3)
                         if "localip" in device:
@@ -895,7 +953,17 @@ def main() -> None:
                     print_if_interactive()
                 else:
                     print_if_interactive(f"{Fore.RED}Unable to get devices from server {current_server}.")
+                if key_written and args.output is None:
+                    break
             output.append({"server": current_server, "homes": all_homes})
+            if key_written and args.output is None:
+                break
+        if args.target_mac is not None and not target_found:
+            _LOGGER.error("Target device was not found.")
+            return 1
+        if args.key_output is not None and not key_written:
+            _LOGGER.error("The target device did not provide a BLE key.")
+            return 1
         if args.output:
             with open(args.output, "w") as f:
                 f.write(json.dumps(output, indent=4))
@@ -906,6 +974,7 @@ def main() -> None:
         print_if_interactive()
         print_if_interactive("Press ENTER to finish")
         input()
+    return 0
 
 
 def get_servers_to_check() -> list[str]:
@@ -932,4 +1001,4 @@ def get_servers_to_check() -> list[str]:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

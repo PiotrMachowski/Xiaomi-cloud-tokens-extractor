@@ -71,6 +71,23 @@ If you have problems with using this tool try following solutions:
 - Use QR code authentication instead of username & password
 - Just wait - there is a [limit of 3/5 (depending on region) 2FA requests per day](https://account.xiaomi.com/helpcenter/faq/en_US/02.faqs/05.sms-and-email-verification-code/faq-3)
 
+### Retrieve one BLE key non-interactively
+
+Use `--target-mac` with `--key-output` when an automation only needs the BLE
+encryption key for one device. The target must be a 48-bit MAC address; the
+example below uses a locally administered example address:
+
+```bash
+python3 token_extractor.py --non_interactive \
+  --username "$XIAOMI_USERNAME" --password "$XIAOMI_PASSWORD" --server de \
+  --target-mac 02:00:00:00:00:01 --key-output ./ble-key.txt
+```
+
+The command exits with a failure if the target or its key is unavailable. To
+avoid overwriting a previously retrieved key, `--key-output` must name a new
+file. On POSIX systems that file is created with owner-only permissions. The key
+is not printed in non-interactive mode.
+
 ## Home Assistant additional tools
 
 * [Map extractor](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Xiaomi-Cloud-Map-Extractor) - live map for Xiaomi Vacuums
