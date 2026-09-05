@@ -61,6 +61,22 @@ pip3 install -r requirements.txt
 python3 token_extractor.py
 ```
 
+### Non-interactive QR authentication
+
+QR authentication can be used without reading from standard input. Store the QR
+image and extractor output in a private directory because both contain sensitive
+account data:
+
+```bash
+python3 token_extractor.py --non_interactive --auth-method qr \
+  --qr-output ./login-qr.png --server de --output ./devices.json
+```
+
+Omit `--server` to check every supported region. The QR image is published
+atomically and is created with owner-only permissions on POSIX systems. A new run
+removes any stale image before requesting another one. Remove the image after
+authentication finishes. QR authentication errors return a non-zero exit status.
+
 ## Troubleshooting
 
 If you have problems with using this tool try following solutions:
