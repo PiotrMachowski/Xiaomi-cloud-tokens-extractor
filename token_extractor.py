@@ -1,3 +1,13 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "charset-normalizer>=3.4.4",
+#     "colorama>=0.4.6",
+#     "pillow>=12.1.1",
+#     "pycryptodome>=3.23.0",
+#     "requests>=2.32.5",
+# ]
+# ///
 from abc import ABC, abstractmethod
 import argparse
 import base64
@@ -43,11 +53,26 @@ NAME_TO_LEVEL = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-ni", "--non_interactive", required=False, help="Non-interactive mode", action="store_true")
+parser.add_argument(
+    "-ni",
+    "--non_interactive",
+    required=False,
+    help="Non-interactive mode",
+    action="store_true",
+)
 parser.add_argument("-u", "--username", required=False, help="Username")
 parser.add_argument("-p", "--password", required=False, help="Password")
-parser.add_argument("-s", "--server", required=False, help="Server", choices=[*SERVERS, ""])
-parser.add_argument("-l", "--log_level", required=False, help="Log level", default="CRITICAL", choices=list(NAME_TO_LEVEL.keys()))
+parser.add_argument(
+    "-s", "--server", required=False, help="Server", choices=[*SERVERS, ""]
+)
+parser.add_argument(
+    "-l",
+    "--log_level",
+    required=False,
+    help="Log level",
+    default="CRITICAL",
+    choices=list(NAME_TO_LEVEL.keys()),
+)
 parser.add_argument("-o", "--output", required=False, help="Output file")
 parser.add_argument("--host", required=False, help="Host")
 args = parser.parse_args()
@@ -55,6 +80,7 @@ if args.non_interactive and (not args.username or not args.password):
     parser.error("You need to specify username and password or run as interactive.")
 
 init(autoreset=True)
+
 
 class ColorFormatter(logging.Formatter):
     COLORS = {
@@ -76,17 +102,19 @@ class ColorLogger(logging.Logger):
     def __init__(self, name: str) -> None:
         level = NAME_TO_LEVEL[args.log_level.upper()]
         logging.Logger.__init__(self, name, level)
-        color_formatter = ColorFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        color_formatter = ColorFormatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(color_formatter)
         self.addHandler(handler)
+
 
 logging.setLoggerClass(ColorLogger)
 _LOGGER = logging.getLogger("token_extractor")
 
 
 class XiaomiCloudConnector(ABC):
-
     def __init__(self):
         self._agent = self.generate_agent()
         self._device_id = self.generate_device_id()
@@ -102,30 +130,29 @@ class XiaomiCloudConnector(ABC):
     def get_homes(self, country):
         url = self.get_api_url(country) + "/v2/homeroom/gethome"
         params = {
-            "data": '{"fg": true, "fetch_share": true, "fetch_share_dev": true, "limit": 300, "app_ver": 7}'}
+            "data": '{"fg": true, "fetch_share": true, "fetch_share_dev": true, "limit": 300, "app_ver": 7}'
+        }
         return self.execute_api_call_encrypted(url, params)
 
     def get_devices(self, country, home_id, owner_id):
         url = self.get_api_url(country) + "/v2/home/home_device_list"
         params = {
-            "data": '{"home_owner": ' + str(owner_id) +
-            ',"home_id": ' + str(home_id) +
-            ',  "limit": 200,  "get_split_device": true, "support_smart_home": true}'
+            "data": '{"home_owner": '
+            + str(owner_id)
+            + ',"home_id": '
+            + str(home_id)
+            + ',  "limit": 200,  "get_split_device": true, "support_smart_home": true}'
         }
         return self.execute_api_call_encrypted(url, params)
 
     def get_dev_cnt(self, country):
         url = self.get_api_url(country) + "/v2/user/get_device_cnt"
-        params = {
-            "data": '{ "fetch_own": true, "fetch_share": true}'
-        }
+        params = {"data": '{ "fetch_own": true, "fetch_share": true}'}
         return self.execute_api_call_encrypted(url, params)
 
     def get_beaconkey(self, country, did):
         url = self.get_api_url(country) + "/v2/device/blt_get_beaconkey"
-        params = {
-            "data": '{"did":"' + did + '","pdid":1}'
-        }
+        params = {"data": '{"did":"' + did + '","pdid":1}'}
         return self.execute_api_call_encrypted(url, params)
 
     def execute_api_call_encrypted(self, url, params):
@@ -144,29 +171,43 @@ class XiaomiCloudConnector(ABC):
             "timezone": "GMT+02:00",
             "is_daylight": "1",
             "dst_offset": "3600000",
-            "channel": "MI_APP_STORE"
+            "channel": "MI_APP_STORE",
         }
         millis = round(time.time() * 1000)
         nonce = self.generate_nonce(millis)
         signed_nonce = self.signed_nonce(nonce)
-        fields = self.generate_enc_params(url, "POST", signed_nonce, nonce, params, self._ssecurity)
-        response = self._session.post(url, headers=headers, cookies=cookies, params=fields)
+        fields = self.generate_enc_params(
+            url, "POST", signed_nonce, nonce, params, self._ssecurity
+        )
+        response = self._session.post(
+            url, headers=headers, cookies=cookies, params=fields
+        )
         if response.status_code == 200:
-            decoded = self.decrypt_rc4(self.signed_nonce(fields["_nonce"]), response.text)
+            decoded = self.decrypt_rc4(
+                self.signed_nonce(fields["_nonce"]), response.text
+            )
             return json.loads(decoded)
         return None
 
     @staticmethod
     def get_api_url(country):
-        return "https://" + ("" if country == "cn" else (country + ".")) + "api.io.mi.com/app"
+        return (
+            "https://"
+            + ("" if country == "cn" else (country + "."))
+            + "api.io.mi.com/app"
+        )
 
     def signed_nonce(self, nonce):
-        hash_object = hashlib.sha256(base64.b64decode(self._ssecurity) + base64.b64decode(nonce))
+        hash_object = hashlib.sha256(
+            base64.b64decode(self._ssecurity) + base64.b64decode(nonce)
+        )
         return base64.b64encode(hash_object.digest()).decode("utf-8")
 
     @staticmethod
     def signed_nonce_sec(nonce, ssecurity):
-        hash_object = hashlib.sha256(base64.b64decode(ssecurity) + base64.b64decode(nonce))
+        hash_object = hashlib.sha256(
+            base64.b64decode(ssecurity) + base64.b64decode(nonce)
+        )
         return base64.b64encode(hash_object.digest()).decode("utf-8")
 
     @staticmethod
@@ -179,12 +220,16 @@ class XiaomiCloudConnector(ABC):
         agent_id = "".join(
             map(lambda i: chr(i), [random.randint(65, 69) for _ in range(13)])
         )
-        random_text = "".join(map(lambda i: chr(i), [random.randint(97, 122) for _ in range(18)]))
+        random_text = "".join(
+            map(lambda i: chr(i), [random.randint(97, 122) for _ in range(18)])
+        )
         return f"{random_text}-{agent_id} APP/com.xiaomi.mihome APPV/10.5.201"
 
     @staticmethod
     def generate_device_id():
-        return "".join(map(lambda i: chr(i), [random.randint(97, 122) for _ in range(6)]))
+        return "".join(
+            map(lambda i: chr(i), [random.randint(97, 122) for _ in range(6)])
+        )
 
     @staticmethod
     def generate_signature(url, signed_nonce, nonce, params):
@@ -192,28 +237,43 @@ class XiaomiCloudConnector(ABC):
         for k, v in params.items():
             signature_params.append(f"{k}={v}")
         signature_string = "&".join(signature_params)
-        signature = hmac.new(base64.b64decode(signed_nonce), msg=signature_string.encode(), digestmod=hashlib.sha256)
+        signature = hmac.new(
+            base64.b64decode(signed_nonce),
+            msg=signature_string.encode(),
+            digestmod=hashlib.sha256,
+        )
         return base64.b64encode(signature.digest()).decode()
 
     @staticmethod
     def generate_enc_signature(url, method, signed_nonce, params):
-        signature_params = [str(method).upper(), url.split("com")[1].replace("/app/", "/")]
+        signature_params = [
+            str(method).upper(),
+            url.split("com")[1].replace("/app/", "/"),
+        ]
         for k, v in params.items():
             signature_params.append(f"{k}={v}")
         signature_params.append(signed_nonce)
         signature_string = "&".join(signature_params)
-        return base64.b64encode(hashlib.sha1(signature_string.encode("utf-8")).digest()).decode()
+        return base64.b64encode(
+            hashlib.sha1(signature_string.encode("utf-8")).digest()
+        ).decode()
 
     @staticmethod
     def generate_enc_params(url, method, signed_nonce, nonce, params, ssecurity):
-        params["rc4_hash__"] = XiaomiCloudConnector.generate_enc_signature(url, method, signed_nonce, params)
+        params["rc4_hash__"] = XiaomiCloudConnector.generate_enc_signature(
+            url, method, signed_nonce, params
+        )
         for k, v in params.items():
             params[k] = XiaomiCloudConnector.encrypt_rc4(signed_nonce, v)
-        params.update({
-            "signature": XiaomiCloudConnector.generate_enc_signature(url, method, signed_nonce, params),
-            "ssecurity": ssecurity,
-            "_nonce": nonce,
-        })
+        params.update(
+            {
+                "signature": XiaomiCloudConnector.generate_enc_signature(
+                    url, method, signed_nonce, params
+                ),
+                "ssecurity": ssecurity,
+                "_nonce": nonce,
+            }
+        )
         return params
 
     @staticmethod
@@ -234,7 +294,6 @@ class XiaomiCloudConnector(ABC):
 
 
 class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
-
     def __init__(self):
         super().__init__()
         self._sign = None
@@ -247,12 +306,16 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         if args.username:
             self._username = args.username
         else:
-            print_if_interactive(f"Username {Fore.BLUE}(email, phone number or user ID){Style.RESET_ALL}:")
+            print_if_interactive(
+                f"Username {Fore.BLUE}(email, phone number or user ID){Style.RESET_ALL}:"
+            )
             self._username = input()
         if args.password:
             self._password = args.password
         else:
-            print_if_interactive(f"Password {Fore.BLUE}(not displayed for privacy reasons){Style.RESET_ALL}:")
+            print_if_interactive(
+                f"Password {Fore.BLUE}(not displayed for privacy reasons){Style.RESET_ALL}:"
+            )
             self._password = getpass("")
 
         print_if_interactive()
@@ -260,7 +323,9 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         print_if_interactive()
 
         self._session.cookies.set("sdkVersion", "accountsdk-18.8.15", domain="mi.com")
-        self._session.cookies.set("sdkVersion", "accountsdk-18.8.15", domain="xiaomi.com")
+        self._session.cookies.set(
+            "sdkVersion", "accountsdk-18.8.15", domain="xiaomi.com"
+        )
         self._session.cookies.set("deviceId", self._device_id, domain="mi.com")
         self._session.cookies.set("deviceId", self._device_id, domain="xiaomi.com")
 
@@ -283,11 +348,9 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         url = "https://account.xiaomi.com/pass/serviceLogin?sid=xiaomiio&_json=true"
         headers = {
             "User-Agent": self._agent,
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/x-www-form-urlencoded",
         }
-        cookies = {
-            "userId": self._username
-        }
+        cookies = {"userId": self._username}
         response = self._session.get(url, headers=headers, cookies=cookies)
         _LOGGER.debug(response.text)
         json_resp = self.to_json(response.text)
@@ -312,7 +375,7 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         url: str = "https://account.xiaomi.com/pass/serviceLoginAuth2"
         headers: dict = {
             "User-Agent": self._agent,
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/x-www-form-urlencoded",
         }
         fields: dict = {
             "sid": "xiaomiio",
@@ -321,12 +384,14 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
             "qs": "%3Fsid%3Dxiaomiio%26_json%3Dtrue",
             "user": self._username,
             "_sign": self._sign,
-            "_json": "true"
+            "_json": "true",
         }
         _LOGGER.debug("login_step_2: URL: %s", url)
         _LOGGER.debug("login_step_2: Fields: %s", fields)
 
-        response = self._session.post(url, headers=headers, params=fields, allow_redirects=False)
+        response = self._session.post(
+            url, headers=headers, params=fields, allow_redirects=False
+        )
         _LOGGER.debug("login_step_2: Response text: %s", response.text)
 
         valid: bool = response is not None and response.status_code == 200
@@ -343,8 +408,12 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
                 # Add captcha code to the fields and retry
                 fields["captCode"] = captcha_code
                 _LOGGER.debug("Retrying login with captcha.")
-                response = self._session.post(url, headers=headers, params=fields, allow_redirects=False)
-                _LOGGER.debug("login_step_2: Retry Response text: %s", response.text[:1000])
+                response = self._session.post(
+                    url, headers=headers, params=fields, allow_redirects=False
+                )
+                _LOGGER.debug(
+                    "login_step_2: Retry Response text: %s", response.text[:1000]
+                )
                 if response is not None and response.status_code == 200:
                     json_resp = self.to_json(response.text)
                 else:
@@ -369,16 +438,22 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
                     verify_url = json_resp["notificationUrl"]
                     return self.do_2fa_email_flow(verify_url)
                 else:
-                    _LOGGER.error("login_step_2: Login failed, server returned: %s", json_resp)
+                    _LOGGER.error(
+                        "login_step_2: Login failed, server returned: %s", json_resp
+                    )
         else:
-            _LOGGER.error("login_step_2: HTTP status: %s; Response: %s", response.status_code, response.text[:500])
+            _LOGGER.error(
+                "login_step_2: HTTP status: %s; Response: %s",
+                response.status_code,
+                response.text[:500],
+            )
         return valid
 
     def login_step_3(self):
         _LOGGER.debug("login_step_3")
         headers = {
             "User-Agent": self._agent,
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/x-www-form-urlencoded",
         }
         response = self._session.get(self._location, headers=headers)
         _LOGGER.debug(response.text)
@@ -400,17 +475,18 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         print_if_interactive(f"{Fore.YELLOW}Captcha verification required.")
         present_image_image(
             response.content,
-            message_url = f"Image URL: {Fore.BLUE}http://{args.host or '127.0.0.1'}:31415",
-            message_file_saved = "Captcha image saved at: {}",
-            message_manually_open_file = "Please open {} and solve the captcha."
+            message_url=f"Image URL: {Fore.BLUE}http://{args.host or '127.0.0.1'}:31415",
+            message_file_saved="Captcha image saved at: {}",
+            message_manually_open_file="Please open {} and solve the captcha.",
         )
 
         # Ask user for a captcha solution
-        print_if_interactive(f"Enter captcha as shown in the image {Fore.BLUE}(case-sensitive){Style.RESET_ALL}:")
+        print_if_interactive(
+            f"Enter captcha as shown in the image {Fore.BLUE}(case-sensitive){Style.RESET_ALL}:"
+        )
         captcha_solution: str = input().strip()
         print_if_interactive()
         return captcha_solution
-
 
     def do_2fa_email_flow(self, notification_url: str) -> bool:
         """
@@ -420,7 +496,7 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         # 1) Open notificationUrl (authStart)
         headers = {
             "User-Agent": self._agent,
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/x-www-form-urlencoded",
         }
         _LOGGER.debug("Opening notificationUrl (authStart): %s", notification_url)
         r = self._session.get(notification_url, headers=headers)
@@ -428,13 +504,13 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
 
         # 2) Fetch identity options (list)
         context = parse_qs(urlparse(notification_url).query)["context"][0]
-        list_params = {
-            "sid": "xiaomiio",
-            "context": context,
-            "_locale": "en_US"
-        }
+        list_params = {"sid": "xiaomiio", "context": context, "_locale": "en_US"}
         _LOGGER.debug("GET /identity/list params=%s", list_params)
-        r = self._session.get("https://account.xiaomi.com/identity/list", params=list_params, headers=headers)
+        r = self._session.get(
+            "https://account.xiaomi.com/identity/list",
+            params=list_params,
+            headers=headers,
+        )
         _LOGGER.debug("identity/list status=%s", r.status_code)
 
         # 3) Request email ticket
@@ -443,18 +519,25 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
             "sid": "xiaomiio",
             "context": list_params["context"],
             "mask": "0",
-            "_locale": "en_US"
+            "_locale": "en_US",
         }
         send_data = {
             "retry": "0",
             "icode": "",
             "_json": "true",
-            "ick": self._session.cookies.get("ick", "")
+            "ick": self._session.cookies.get("ick", ""),
         }
-        _LOGGER.debug("sendEmailTicket POST url=https://account.xiaomi.com/identity/auth/sendEmailTicket params=%s", send_params)
+        _LOGGER.debug(
+            "sendEmailTicket POST url=https://account.xiaomi.com/identity/auth/sendEmailTicket params=%s",
+            send_params,
+        )
         _LOGGER.debug("sendEmailTicket data=%s", send_data)
-        r = self._session.post("https://account.xiaomi.com/identity/auth/sendEmailTicket",
-                               params=send_params, data=send_data, headers=headers)
+        r = self._session.post(
+            "https://account.xiaomi.com/identity/auth/sendEmailTicket",
+            params=send_params,
+            data=send_data,
+            headers=headers,
+        )
         try:
             jr = r.json()
         except Exception:
@@ -463,9 +546,13 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
 
         # 4) Ask user for the email code and verify
         if args.non_interactive:
-            parser.error("Email verification code required, rerun without --non_interactive")
+            parser.error(
+                "Email verification code required, rerun without --non_interactive"
+            )
 
-        print_if_interactive(f"{Fore.YELLOW}Two factor authentication required, please provide the code from the email.")
+        print_if_interactive(
+            f"{Fore.YELLOW}Two factor authentication required, please provide the code from the email."
+        )
         print_if_interactive()
         print_if_interactive("2FA Code:")
         code = input().strip()
@@ -477,19 +564,25 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
             "sid": "xiaomiio",
             "context": list_params["context"],
             "mask": "0",
-            "_locale": "en_US"
+            "_locale": "en_US",
         }
         verify_data = {
             "_flag": "8",
             "ticket": code,
             "trust": "false",
             "_json": "true",
-            "ick": self._session.cookies.get("ick", "")
+            "ick": self._session.cookies.get("ick", ""),
         }
-        r = self._session.post("https://account.xiaomi.com/identity/auth/verifyEmail",
-                               params=verify_params, data=verify_data, headers=headers)
+        r = self._session.post(
+            "https://account.xiaomi.com/identity/auth/verifyEmail",
+            params=verify_params,
+            data=verify_data,
+            headers=headers,
+        )
         if r.status_code != 200:
-            _LOGGER.error("verifyEmail failed: status=%s body=%s", r.status_code, r.text[:500])
+            _LOGGER.error(
+                "verifyEmail failed: status=%s body=%s", r.status_code, r.text[:500]
+            )
             return False
 
         try:
@@ -498,10 +591,15 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
             finish_loc = jr.get("location")
         except Exception:
             # Non-JSON or empty; try to extract from headers or body
-            _LOGGER.debug("verifyEmail returned non-JSON, attempting fallback extraction.")
+            _LOGGER.debug(
+                "verifyEmail returned non-JSON, attempting fallback extraction."
+            )
             finish_loc = r.headers.get("Location")
             if not finish_loc and r.text:
-                m = re.search(r'https://account\.xiaomi\.com/identity/result/check\?[^"\']+', r.text)
+                m = re.search(
+                    r'https://account\.xiaomi\.com/identity/result/check\?[^"\']+',
+                    r.text,
+                )
                 if m:
                     finish_loc = m.group(0)
 
@@ -512,11 +610,19 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
                 "https://account.xiaomi.com/identity/result/check",
                 params={"sid": "xiaomiio", "context": context, "_locale": "en_US"},
                 headers=headers,
-                allow_redirects=False
+                allow_redirects=False,
             )
-            _LOGGER.debug("result/check (fallback) status=%s hop-> %s", r0.status_code, r0.headers.get("Location"))
+            _LOGGER.debug(
+                "result/check (fallback) status=%s hop-> %s",
+                r0.status_code,
+                r0.headers.get("Location"),
+            )
             if r0.status_code in (301, 302) and r0.headers.get("Location"):
-                finish_loc = r0.url if "serviceLoginAuth2/end" in r0.url else r0.headers["Location"]
+                finish_loc = (
+                    r0.url
+                    if "serviceLoginAuth2/end" in r0.url
+                    else r0.headers["Location"]
+                )
 
         if not finish_loc:
             _LOGGER.error("Unable to determine finish location after verifyEmail.")
@@ -525,7 +631,11 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         # First hop: GET identity/result/check (do NOT follow redirects to inspect Location)
         if "identity/result/check" in finish_loc:
             r = self._session.get(finish_loc, headers=headers, allow_redirects=False)
-            _LOGGER.debug("result/check status=%s hop-> %s", r.status_code, r.headers.get("Location"))
+            _LOGGER.debug(
+                "result/check status=%s hop-> %s",
+                r.status_code,
+                r.headers.get("Location"),
+            )
             end_url = r.headers.get("Location")
         else:
             end_url = finish_loc
@@ -549,7 +659,9 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
                 ep_json = json.loads(ext_prag)
                 ssec = ep_json.get("ssecurity")
                 psec = ep_json.get("psecurity")
-                _LOGGER.debug("extension-pragma present. ssecurity=%s psecurity=%s", ssec, psec)
+                _LOGGER.debug(
+                    "extension-pragma present. ssecurity=%s psecurity=%s", ssec, psec
+                )
                 if ssec:
                     self._ssecurity = ssec
             except Exception as e:
@@ -575,25 +687,39 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
         r = self._session.get(sts_url, headers=headers, allow_redirects=True)
         _LOGGER.debug("STS final URL: %s status=%s", r.url, r.status_code)
         if r.status_code != 200:
-            _LOGGER.error("STS did not complete: status=%s body=%s", r.status_code, r.text[:200])
+            _LOGGER.error(
+                "STS did not complete: status=%s body=%s", r.status_code, r.text[:200]
+            )
             return False
 
         # Extract serviceToken from cookie jar
-        self._serviceToken = self._session.cookies.get("serviceToken", domain=".sts.api.io.mi.com")
+        self._serviceToken = self._session.cookies.get(
+            "serviceToken", domain=".sts.api.io.mi.com"
+        )
         found = bool(self._serviceToken)
         _LOGGER.debug("STS body (trunc)=%s", r.text[:20])
         if not found:
             _LOGGER.error("Could not parse serviceToken; cannot complete login.")
             return False
-        _LOGGER.debug("STS did not return JSON; assuming 'ok' style response and relying on cookies.")
+        _LOGGER.debug(
+            "STS did not return JSON; assuming 'ok' style response and relying on cookies."
+        )
         _LOGGER.debug("extract_service_token: found=%s", found)
 
         # Mirror serviceToken to API domains expected by Mi Cloud
         self.install_service_token_cookies(self._serviceToken)
 
         # Update ids from cookies if available
-        self.userId = self.userId or self._session.cookies.get("userId", domain=".xiaomi.com") or self._session.cookies.get("userId", domain=".sts.api.io.mi.com")
-        self._cUserId = self._cUserId or self._session.cookies.get("cUserId", domain=".xiaomi.com") or self._session.cookies.get("cUserId", domain=".sts.api.io.mi.com")
+        self.userId = (
+            self.userId
+            or self._session.cookies.get("userId", domain=".xiaomi.com")
+            or self._session.cookies.get("userId", domain=".sts.api.io.mi.com")
+        )
+        self._cUserId = (
+            self._cUserId
+            or self._session.cookies.get("cUserId", domain=".xiaomi.com")
+            or self._session.cookies.get("cUserId", domain=".sts.api.io.mi.com")
+        )
         return True
 
     def install_service_token_cookies(self, token: str):
@@ -603,7 +729,6 @@ class PasswordXiaomiCloudConnector(XiaomiCloudConnector):
 
 
 class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
-
     def __init__(self):
         super().__init__()
         self._cUserId = None
@@ -644,7 +769,7 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
             "sid": "xiaomiio",
             "serviceParam": "",
             "_locale": "en_GB",
-            "_dc": str(int(time.time() * 1000))
+            "_dc": str(int(time.time() * 1000)),
         }
 
         response = self._session.get(url, params=data)
@@ -670,21 +795,29 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
         valid: bool = response is not None and response.status_code == 200
 
         if valid:
-            print_if_interactive(f"{Fore.BLUE}Please scan the following QR code to log in.")
+            print_if_interactive(
+                f"{Fore.BLUE}Please scan the following QR code to log in."
+            )
 
             present_image_image(
                 response.content,
-                message_url = f"QR code URL: {Fore.BLUE}http://{args.host or '127.0.0.1'}:31415",
-                message_file_saved = "QR code image saved at: {}",
-                message_manually_open_file = "Please open {} and scan the QR code."
+                message_url=f"QR code URL: {Fore.BLUE}http://{args.host or '127.0.0.1'}:31415",
+                message_file_saved="QR code image saved at: {}",
+                message_manually_open_file="Please open {} and scan the QR code.",
             )
             print_if_interactive()
-            print_if_interactive(f"{Fore.BLUE}Alternatively you can visit the following URL:")
+            print_if_interactive(
+                f"{Fore.BLUE}Alternatively you can visit the following URL:"
+            )
             print_if_interactive(f"{Fore.BLUE}  {self._login_url}")
             print_if_interactive()
             return True
         else:
-            _LOGGER.error("login_step_2: HTTP status: %s; Response: %s", response.status_code, response.text[:500])
+            _LOGGER.error(
+                "login_step_2: HTTP status: %s; Response: %s",
+                response.status_code,
+                response.text[:500],
+            )
         return False
 
     def login_step_3(self) -> bool:
@@ -701,7 +834,9 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
             except requests.exceptions.Timeout:
                 _LOGGER.debug("Long polling timed out, retrying...")
                 if time.time() - start_time > self._timeout:
-                    _LOGGER.debug("Long polling timed out after {} seconds.".format(self._timeout))
+                    _LOGGER.debug(
+                        "Long polling timed out after {} seconds.".format(self._timeout)
+                    )
                     break
                 continue
             except requests.exceptions.RequestException as e:
@@ -714,7 +849,9 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
                 _LOGGER.error("Long polling failed, retrying...")
 
         if response.status_code != 200:
-            _LOGGER.error("Long polling failed with status code: " + str(response.status_code))
+            _LOGGER.error(
+                "Long polling failed with status code: " + str(response.status_code)
+            )
             return False
 
         _LOGGER.debug("Login successful!")
@@ -745,7 +882,9 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
             _LOGGER.error("No location found.")
             return False
 
-        response = self._session.get(location, headers={"content-type": "application/x-www-form-urlencoded"})
+        response = self._session.get(
+            location, headers={"content-type": "application/x-www-form-urlencoded"}
+        )
         if response.status_code != 200:
             return False
 
@@ -754,9 +893,10 @@ class QrCodeXiaomiCloudConnector(XiaomiCloudConnector):
         return True
 
 
-def print_if_interactive(value: str="") -> None:
+def print_if_interactive(value: str = "") -> None:
     if not args.non_interactive:
         print(value)
+
 
 def print_tabbed(value: str, tab: int) -> None:
     print_if_interactive(" " * tab + value)
@@ -764,24 +904,28 @@ def print_tabbed(value: str, tab: int) -> None:
 
 def print_entry(key: str, value: str, tab: int) -> None:
     if value:
-        print_tabbed(f'{Fore.YELLOW}{key + ":": <10}{Style.RESET_ALL}{value}', tab)
+        print_tabbed(f"{Fore.YELLOW}{key + ':': <10}{Style.RESET_ALL}{value}", tab)
 
 
 def print_banner() -> None:
-    print_if_interactive(Fore.YELLOW + Style.BRIGHT + r"""
+    print_if_interactive(
+        Fore.YELLOW
+        + Style.BRIGHT
+        + r"""
                                Xiaomi Cloud
 ___ ____ _  _ ____ _  _ ____    ____ _  _ ___ ____ ____ ____ ___ ____ ____ 
  |  |  | |_/  |___ |\ | [__     |___  \/   |  |__/ |__| |     |  |  | |__/ 
  |  |__| | \_ |___ | \| ___]    |___ _/\_  |  |  \ |  | |___  |  |__| |  \ 
-""" + Style.NORMAL +
-"""                                                        by Piotr Machowski 
+"""
+        + Style.NORMAL
+        + """                                                        by Piotr Machowski 
 
-    """)
+    """
+    )
 
 
 def start_image_server(image: bytes) -> None:
     class ImgHttpHandler(BaseHTTPRequestHandler):
-
         def do_GET(self) -> None:
             self.send_response(200)
             self.end_headers()
@@ -794,16 +938,16 @@ def start_image_server(image: bytes) -> None:
     _LOGGER.info("server address: %s", httpd.server_address)
     _LOGGER.info("hostname: %s", socket.gethostname())
 
-    thread = threading.Thread(target = httpd.serve_forever)
+    thread = threading.Thread(target=httpd.serve_forever)
     thread.daemon = True
     thread.start()
 
 
 def present_image_image(
-        image_content: bytes,
-        message_url: str,
-        message_file_saved: str,
-        message_manually_open_file: str,
+    image_content: bytes,
+    message_url: str,
+    message_file_saved: str,
+    message_manually_open_file: str,
 ) -> None:
     try:
         # Try to serve an image file
@@ -853,23 +997,38 @@ def main() -> None:
             homes = connector.get_homes(current_server)
             if homes is not None:
                 for h in homes["result"]["homelist"]:
-                    all_homes.append({"home_id": h["id"], "home_owner": connector.userId})
+                    all_homes.append(
+                        {"home_id": h["id"], "home_owner": connector.userId}
+                    )
             dev_cnt = connector.get_dev_cnt(current_server)
             if dev_cnt is not None:
                 for h in dev_cnt["result"]["share"]["share_family"]:
-                    all_homes.append({"home_id": h["home_id"], "home_owner": h["home_owner"]})
+                    all_homes.append(
+                        {"home_id": h["home_id"], "home_owner": h["home_owner"]}
+                    )
 
             if len(all_homes) == 0:
-                print_if_interactive(f'{Fore.RED}No homes found for server "{current_server}".')
+                print_if_interactive(
+                    f'{Fore.RED}No homes found for server "{current_server}".'
+                )
 
             for home in all_homes:
-                devices = connector.get_devices(current_server, home["home_id"], home["home_owner"])
+                devices = connector.get_devices(
+                    current_server, home["home_id"], home["home_owner"]
+                )
                 home["devices"] = []
                 if devices is not None:
-                    if devices["result"]["device_info"] is None or len(devices["result"]["device_info"]) == 0:
-                        print_if_interactive(f'{Fore.RED}No devices found for server "{current_server}" @ home "{home["home_id"]}".')
+                    if (
+                        devices["result"]["device_info"] is None
+                        or len(devices["result"]["device_info"]) == 0
+                    ):
+                        print_if_interactive(
+                            f'{Fore.RED}No devices found for server "{current_server}" @ home "{home["home_id"]}".'
+                        )
                         continue
-                    print_if_interactive(f'Devices found for server "{current_server}" @ home "{home["home_id"]}":')
+                    print_if_interactive(
+                        f'Devices found for server "{current_server}" @ home "{home["home_id"]}":'
+                    )
                     for device in devices["result"]["device_info"]:
                         device_data = {**device}
                         print_tabbed(f"{Fore.BLUE}---------", 3)
@@ -878,9 +1037,17 @@ def main() -> None:
                         if "did" in device:
                             print_entry("ID", device["did"], 3)
                             if "blt" in device["did"]:
-                                beaconkey = connector.get_beaconkey(current_server, device["did"])
-                                if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
-                                    print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
+                                beaconkey = connector.get_beaconkey(
+                                    current_server, device["did"]
+                                )
+                                if (
+                                    beaconkey
+                                    and "result" in beaconkey
+                                    and "beaconkey" in beaconkey["result"]
+                                ):
+                                    print_entry(
+                                        "BLE KEY", beaconkey["result"]["beaconkey"], 3
+                                    )
                                     device_data["BLE_DATA"] = beaconkey["result"]
                         if "mac" in device:
                             print_entry("MAC", device["mac"], 3)
@@ -894,7 +1061,9 @@ def main() -> None:
                     print_tabbed(f"{Fore.BLUE}---------", 3)
                     print_if_interactive()
                 else:
-                    print_if_interactive(f"{Fore.RED}Unable to get devices from server {current_server}.")
+                    print_if_interactive(
+                        f"{Fore.RED}Unable to get devices from server {current_server}."
+                    )
             output.append({"server": current_server, "homes": all_homes})
         if args.output:
             with open(args.output, "w") as f:
@@ -916,10 +1085,13 @@ def get_servers_to_check() -> list[str]:
         server = ""
     else:
         print_if_interactive(
-            f"Select server {Fore.BLUE}(one of: {servers_str}; Leave empty to check all available){Style.RESET_ALL}:")
+            f"Select server {Fore.BLUE}(one of: {servers_str}; Leave empty to check all available){Style.RESET_ALL}:"
+        )
         server = input()
         while server not in ["", *SERVERS]:
-            print_if_interactive(f"{Fore.RED}Invalid server provided. Valid values: {servers_str}")
+            print_if_interactive(
+                f"{Fore.RED}Invalid server provided. Valid values: {servers_str}"
+            )
             print_if_interactive("Server:")
             server = input()
 

@@ -1,0 +1,13 @@
+[project]
+name = "xiaomi-cloud-tokens-extractor"
+version = "0.1.0"
+description = "This tool retrieves tokens for all devices connected to Xiaomi cloud and encryption keys for BLE devices."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "charset-normalizer>=3.4.4",
+    "colorama>=0.4.6",
+    "pillow>=12.1.1",
+    "pycryptodome>=3.23.0",
+    "requests>=2.32.5",
+]
